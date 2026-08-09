@@ -4,3 +4,5 @@ node_modules/
 !.env.example
 data/*.json
 data/*.log
+contracts/cache/
+contracts/out/
