@@ -11,9 +11,9 @@ class MemoryRepository {
   async transact(mutator) { return mutator(this.state); }
 }
 
-async function withServer(config, callback) {
+async function withServer(config, callback, chainReader) {
   const service = new CessioService({ repository: new MemoryRepository(), underwriter: new DeterministicUnderwriter(), clock: () => new Date('2026-08-10T00:00:00Z') });
-  const server = createServer(createApp({ config, service }));
+  const server = createServer(createApp({ config, service, chainReader }));
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const { port } = server.address();
   try {
@@ -39,6 +39,15 @@ test('reports health and refuses writes while wallet authentication is pending',
     assert.equal(response.status, 503);
     assert.equal((await response.json()).error.code, 'AUTH_REQUIRED');
   });
+});
+
+test('returns a normalized Testnet receipt through the same-origin API', async () => {
+  const chainReader = { getReceipt: async (id) => ({ id, status: 3, principal: '100000000', repayment: '105000000', totalFunded: '100000000' }) };
+  await withServer(baseConfig, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/v1/chain/receipts/1`);
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { receipt: { id: 1, status: 3, principal: '100000000', repayment: '105000000', totalFunded: '100000000' } });
+  }, chainReader);
 });
 
 test('runs the testnet development underwriting flow when explicitly enabled', async () => {

@@ -37,10 +37,13 @@ contract CessioReceivablesTest {
 
         vm.prank(FUNDER);
         token.approve(address(cessio), PRINCIPAL);
+        uint256 originatorBalanceBefore = token.balanceOf(ORIGINATOR);
         vm.prank(FUNDER);
         cessio.fund(receivableId, uint128(PRINCIPAL));
         CessioReceivables.Receivable memory receivable = cessio.getReceivable(receivableId);
         _assert(uint256(receivable.status) == uint256(CessioReceivables.Status.Funded));
+        _assert(token.balanceOf(ORIGINATOR) == originatorBalanceBefore + PRINCIPAL);
+        _assert(token.balanceOf(address(cessio)) == 0);
 
         vm.prank(OBLIGOR);
         token.approve(address(cessio), REPAYMENT);
@@ -51,6 +54,7 @@ contract CessioReceivablesTest {
         vm.prank(FUNDER);
         cessio.claim(receivableId);
         _assert(token.balanceOf(FUNDER) == balanceBefore + REPAYMENT);
+        _assert(token.balanceOf(address(cessio)) == 0);
     }
 
     function testOnlyUnderwriterCanCreateReceivable() public {

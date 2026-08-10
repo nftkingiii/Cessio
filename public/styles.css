@@ -1,0 +1,69 @@
+:root { --ink:#101211; --panel:#171a18; --line:#303631; --muted:#9da59e; --paper:#f3f6f1; --signal:#9bed63; --blue:#88abff; --amber:#e9bd5f; --danger:#e06a68; --font:Manrope,Arial,sans-serif; --mono:"DM Mono",monospace; }
+* { box-sizing:border-box; }
+html { scroll-behavior:smooth; }
+body { margin:0; min-width:320px; overflow-x:hidden; background:#101211; color:var(--paper); font-family:var(--font); }
+button,input { font:inherit; }
+button { cursor:pointer; }
+a { color:inherit; text-decoration:none; }
+.rail-lines { position:fixed; inset:0; z-index:-1; display:grid; grid-template-columns:repeat(8,1fr); padding:0 4vw; pointer-events:none; opacity:.28; }
+.rail-lines span { border-left:1px solid #252b27; }
+.app-shell { width:min(1440px,100%); margin:0 auto; padding:24px 4vw 54px; }
+.topbar { min-height:60px; border:1px solid var(--line); background:#121513; border-radius:7px; display:flex; align-items:center; justify-content:space-between; padding:0 16px; position:sticky; top:16px; z-index:5; }
+.brand,.topbar-actions,.topbar nav,.network-status,.label-row,.panel-heading,.section-heading,.workflow-strip,.button,.text-button,.funding-progress>div,.deal-data,.signal-list div,.amount-input { display:flex; align-items:center; }
+.brand { gap:9px; font-weight:800; letter-spacing:-.03em; }
+.brand-mark { width:28px; height:28px; display:block; object-fit:cover; border-radius:3px; }
+.topbar nav { gap:26px; margin-left:62px; font-size:13px; color:var(--muted); }
+.topbar nav a { min-height:44px; display:grid; place-items:center; border-bottom:1px solid transparent; }
+.topbar nav a.active { color:var(--paper); border-color:var(--signal); }
+.topbar-actions { gap:12px; flex-shrink:0; }
+.network-status { gap:7px; color:var(--muted); font:11px var(--mono); white-space:nowrap; }
+.network-status > span:first-child { width:7px; height:7px; background:var(--signal); border-radius:50%; box-shadow:0 0 0 3px #20321d; }
+.button,.text-button,.icon-button { border:0; color:var(--paper); }
+.button { min-height:44px; justify-content:center; gap:9px; border-radius:5px; padding:0 15px; font-size:13px; font-weight:700; }
+.button svg,.text-button svg,.icon-button svg { width:16px; height:16px; }
+.button-quiet { background:#232824; border:1px solid #353d37; }
+.button-primary { background:var(--signal); color:#101211; width:100%; }
+.button[disabled] { cursor:not-allowed; color:#798177; background:#222722; border:1px solid #343b35; }
+.market-intro { display:grid; grid-template-columns:1fr minmax(280px,430px); gap:42px; padding:94px 0 48px; align-items:end; }
+.eyebrow { margin:0 0 11px; color:var(--muted); text-transform:uppercase; letter-spacing:.12em; font:10px var(--mono); }
+.eyebrow span { color:var(--signal); margin-left:6px; }
+h1,h2,p { margin-top:0; }
+h1 { margin-bottom:0; font-size:clamp(48px,7vw,100px); line-height:.91; letter-spacing:-.075em; font-weight:600; }
+h1 em { font-style:normal; color:var(--signal); }
+.intro-copy { color:#c2c8c2; line-height:1.65; margin:0 0 7px; font-size:15px; overflow-wrap:anywhere; }
+.metrics { display:grid; grid-template-columns:repeat(4,1fr); border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+.metrics article { min-width:0; padding:20px 20px 22px 0; border-right:1px solid var(--line); margin-right:20px; }
+.metrics article:last-child { border:0; margin:0; }
+.metrics span,.deal-data span { display:block; color:var(--muted); font-size:11px; margin-bottom:8px; }
+.metrics strong { font-size:24px; letter-spacing:-.06em; display:block; }
+.metrics small { color:var(--muted); font:10px var(--mono); overflow-wrap:anywhere; }
+.chain-proof { display:grid; grid-template-columns:minmax(0,.9fr) minmax(440px,1.1fr); gap:36px; padding:42px 0; border-bottom:1px solid var(--line); }
+.proof-intro h2 { max-width:440px; margin:0 0 14px; font-size:clamp(28px,3vw,42px); line-height:1; letter-spacing:-.06em; font-weight:600; }
+.proof-intro p:last-child { max-width:470px; color:#b7beb8; font-size:13px; line-height:1.65; margin:0; }
+.proof-state { align-self:end; border:1px solid var(--line); background:#151815; padding:20px; border-radius:7px; }
+.proof-state-heading { display:flex; align-items:center; justify-content:space-between; gap:18px; border-bottom:1px solid var(--line); padding-bottom:14px; }
+.status-neutral { color:var(--blue); }.status-review { color:var(--amber); }
+.proof-state dl { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); margin:0; }.proof-state dl div { padding:16px 15px 16px 0; border-right:1px solid var(--line); margin-right:15px; }.proof-state dl div:last-child { border:0; margin:0; }.proof-state dt { color:var(--muted); font-size:10px; margin-bottom:8px; }.proof-state dd { margin:0; font:12px var(--mono); color:var(--paper); overflow-wrap:anywhere; }
+.proof-contracts { display:flex; flex-wrap:wrap; gap:8px 18px; padding:14px 0; border-top:1px solid var(--line); }.proof-contracts a { display:flex; align-items:center; gap:5px; color:var(--muted); font:10px var(--mono); }.proof-contracts a:hover { color:var(--signal); }.proof-contracts svg { width:13px; height:13px; }
+.proof-link { min-height:40px; display:flex; align-items:center; justify-content:space-between; gap:8px; border-top:1px solid var(--line); color:var(--paper); font-size:11px; font-weight:700; }.proof-link:hover { color:var(--signal); }.proof-link svg { width:15px; height:15px; }
+.featured-grid { display:grid; grid-template-columns:minmax(0,1.68fr) minmax(300px,.72fr); gap:18px; padding:40px 0 54px; }
+.featured-receivable,.underwriting-panel { border:1px solid var(--line); background:var(--panel); border-radius:7px; overflow:hidden; }
+.featured-receivable { min-height:495px; position:relative; display:flex; align-items:flex-end; }
+.featured-media { position:absolute; inset:0; background-image:url("https://images.unsplash.com/photo-1484557052118-f32bd25b45b5?auto=format&fit=crop&w=1800&q=85"); background-position:center; background-size:cover; filter:grayscale(1) contrast(1.1) brightness(.28); opacity:.72; }
+.featured-copy { position:relative; padding:28px; width:100%; background:rgba(16,18,17,.83); border-top:1px solid #3c443d; }
+.label-row { justify-content:space-between; gap:16px; }
+.status { display:inline-flex; align-items:center; gap:5px; font:10px var(--mono); letter-spacing:.04em; }
+.status svg { width:13px; height:13px; }.status-approved { color:var(--signal); }.mono { font:10px var(--mono); color:var(--muted); }
+.featured-copy h2,.underwriting-panel h2,.section-heading h2,.fund-drawer h2 { letter-spacing:-.055em; font-weight:600; }.featured-copy h2 { font-size:clamp(30px,4vw,51px); line-height:.94; margin:24px 0 34px; }
+.deal-data { gap:38px; }.deal-data strong { font-size:22px; letter-spacing:-.06em; }.deal-data strong small { color:var(--signal); font-size:12px; letter-spacing:0; }.deal-data span { margin-bottom:5px; }
+.funding-progress { margin-top:30px; gap:14px; }.funding-progress>div:first-child { gap:12px; min-width:172px; font-size:11px; color:var(--muted); }.funding-progress strong { color:var(--paper); font:11px var(--mono); }.progress-track,.mini-progress { background:#303632; height:5px; overflow:hidden; }.progress-track { flex:1; }.progress-track span { display:block; background:var(--signal); height:100%; width:64%; }
+.underwriting-panel { padding:26px; display:flex; flex-direction:column; }.panel-heading { justify-content:space-between; }.panel-heading h2 { font-size:29px; margin:0; }.risk-number { font:48px/.8 var(--mono); color:var(--signal); letter-spacing:-.09em; }.risk-number small { color:var(--muted); font-size:11px; letter-spacing:0; }
+.signal-meter { height:7px; background:#303632; margin:32px 0 26px; overflow:hidden; }.signal-meter span { display:block; height:100%; width:18%; background:var(--signal); }
+.signal-list { margin:0; }.signal-list div { justify-content:space-between; padding:14px 0; border-top:1px solid var(--line); font-size:12px; }.signal-list dt { color:var(--muted); }.signal-list dd { margin:0; display:flex; gap:5px; align-items:center; }.signal-list svg { width:14px; height:14px; color:var(--signal); }.underwriting-panel .button { margin-top:auto; }
+.market-table-section { border-top:1px solid var(--line); padding-top:28px; }.section-heading { justify-content:space-between; }.section-heading h2 { font-size:30px; margin:0; }.text-button { background:transparent; display:inline-flex; gap:8px; align-items:center; color:var(--paper); padding:10px 0; font-size:12px; font-weight:700; }.text-button:hover { color:var(--signal); }
+.table-wrap { overflow:auto; margin-top:25px; border:1px solid var(--line); border-radius:7px; } table { width:100%; border-collapse:collapse; min-width:760px; background:#151815; } th,td { text-align:left; border-bottom:1px solid #2a302c; padding:18px 16px; font-size:12px; } th { color:var(--muted); font:10px var(--mono); text-transform:uppercase; letter-spacing:.08em; } tbody tr:last-child td { border:0; } tbody tr:hover { background:#1b201c; } td strong,td span { display:block; } td>span { color:var(--muted); margin-top:4px; font-size:10px; }.risk-pill { display:inline-block; border:1px solid; border-radius:2px; padding:4px 6px; font:10px var(--mono); }.risk-pill.low { color:var(--signal); border-color:#4c7135; }.risk-pill.review { color:var(--amber); border-color:#67552d; }.mini-progress { width:78px; display:inline-block; margin-right:8px; }.mini-progress span { height:100%; display:block; background:var(--signal); }.icon-button { width:36px; height:36px; border:1px solid #394039; background:transparent; border-radius:4px; display:grid; place-items:center; }.icon-button:hover { border-color:var(--signal); color:var(--signal); }
+.workflow-strip { justify-content:space-between; gap:24px; padding:32px 0; border-bottom:1px solid var(--line); }.workflow-strip .eyebrow { margin:0; min-width:134px; }.workflow-strip ol { display:flex; list-style:none; gap:18px; padding:0; margin:0; flex:1; }.workflow-strip li { color:#d5dbd4; font-size:12px; }.workflow-strip li span { color:var(--signal); font:10px var(--mono); margin-right:5px; }
+.fund-drawer { position:fixed; z-index:20; top:0; right:0; width:min(430px,100vw); height:100dvh; background:#151916; padding:32px; border-left:1px solid #414a42; transform:translateX(100%); transition:transform .25s ease; }.fund-drawer.open { transform:translateX(0); }.close-drawer { margin-left:auto; }.fund-drawer h2 { font-size:39px; line-height:.98; margin:24px 0 16px; }.drawer-copy { color:#b7beb8; line-height:1.6; font-size:14px; margin-bottom:35px; }.fund-drawer label { font:11px var(--mono); color:var(--muted); }.amount-input { margin:8px 0 18px; border-bottom:1px solid #4a544b; justify-content:space-between; }.amount-input input { width:100%; padding:13px 0; background:transparent; border:0; outline:0; color:var(--paper); font-size:27px; letter-spacing:-.05em; }.amount-input span { color:var(--signal); font:12px var(--mono); }.drawer-footnote { margin-top:18px; display:flex; gap:7px; color:var(--muted); font-size:11px; align-items:center; }.drawer-footnote svg { width:14px; color:var(--signal); }.drawer-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.56); z-index:15; }
+@media (max-width:850px) { .topbar nav { display:none; }.market-intro { grid-template-columns:minmax(0,1fr); padding-top:72px; gap:20px; }.metrics { grid-template-columns:repeat(2,minmax(0,1fr)); }.metrics article:nth-child(2) { border-right:0; margin-right:0; }.chain-proof { grid-template-columns:1fr; gap:24px; }.featured-grid { grid-template-columns:1fr; }.underwriting-panel { min-height:360px; }.workflow-strip { align-items:flex-start; flex-direction:column; }.workflow-strip ol { flex-wrap:wrap; }.topbar-actions .network-status { display:none; } }
+@media (max-width:520px) { .app-shell { padding:14px 16px 32px; }.topbar { top:8px; padding:0 10px; }.button-quiet span { display:none; }.button-quiet { width:42px; padding:0; }.market-intro { padding-top:55px; }.metrics { margin:0 -16px; padding:0 16px; }.metrics article { margin-right:12px; padding-right:12px; }.metrics strong { font-size:21px; }.proof-state { padding:16px; }.proof-state dl { grid-template-columns:1fr; }.proof-state dl div { border-right:0; border-bottom:1px solid var(--line); margin:0; padding:13px 0; }.proof-state dl div:last-child { border-bottom:0; }.proof-contracts { flex-direction:column; gap:11px; }.featured-copy { padding:22px; }.deal-data { gap:18px; }.deal-data strong { font-size:18px; }.funding-progress>div:first-child { min-width:auto; }.featured-receivable { min-height:460px; }.workflow-strip ol { gap:12px; }.workflow-strip li { font-size:11px; } }
+@media (prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto!important; transition:none!important; animation:none!important; } }

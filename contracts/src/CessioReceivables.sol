@@ -164,7 +164,10 @@ contract CessioReceivables {
         _pullExact(receivable.settlementToken, msg.sender, amount);
         receivable.totalFunded += amount;
         fundedBy[receivableId][msg.sender] += amount;
-        if (receivable.totalFunded == receivable.principal) receivable.status = Status.Funded;
+        if (receivable.totalFunded == receivable.principal) {
+            receivable.status = Status.Funded;
+            _push(receivable.settlementToken, receivable.originator, receivable.principal);
+        }
         emit Funded(receivableId, msg.sender, amount, receivable.totalFunded);
     }
 

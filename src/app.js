@@ -6,7 +6,7 @@ const WINDOW_MS = 15 * 60 * 1000;
 const MAX_REQUESTS_PER_WINDOW = 120;
 const MAX_WRITES_PER_WINDOW = 25;
 
-export function createApp({ config, service }) {
+export function createApp({ config, service, chainReader }) {
   const limits = new Map();
 
   return async function app(request, response) {
@@ -20,6 +20,11 @@ export function createApp({ config, service }) {
       const url = new URL(request.url, 'http://localhost');
       if (request.method === 'GET' && url.pathname === '/health') {
         return send(response, 200, { status: 'ok', service: 'cessio-api', underwritingProvider: config.underwritingProvider, unauthenticatedWritesEnabled: config.allowUnauthenticatedWrites }, requestId);
+      }
+      const chainReceiptMatch = url.pathname.match(/^\/v1\/chain\/receipts\/([1-9]\d*)$/);
+      if (request.method === 'GET' && chainReceiptMatch) {
+        if (!chainReader) return send(response, 503, { error: { code: 'CHAIN_READER_UNAVAILABLE', message: 'Testnet receipt reader is unavailable' } }, requestId);
+        return send(response, 200, { receipt: await chainReader.getReceipt(Number(chainReceiptMatch[1])) }, requestId);
       }
 
       if (isWrite(request.method) && !config.allowUnauthenticatedWrites) {

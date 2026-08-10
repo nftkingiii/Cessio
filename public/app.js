@@ -1,0 +1,298 @@
+const TESTNET = Object.freeze({
+  chainId: '0x3c8',
+  chainName: 'BOT Chain Testnet',
+  nativeCurrency: { name: 'BOT', symbol: 'BOT', decimals: 18 },
+  rpcUrls: ['https://rpc.bohr.life'],
+  blockExplorerUrls: ['https://scan.bohr.life']
+});
+
+const CONTRACTS = Object.freeze({
+  token: '0x4D0984B958b4376dE072DC098404c4afA9155C90',
+  receivables: '0x212d99C7fC7C83901e8d6BB0F82d937F9735d248',
+  receiptId: 1n
+});
+
+const RECEIVABLE_STATUS = ['Unissued', 'Funding', 'Funded', 'Repaid', 'Cancelled'];
+const state = { account: null, receipt: null, receiptError: null, pending: false };
+
+const walletButton = document.querySelector('#connect-wallet');
+const networkStatusText = document.querySelector('#network-status-text');
+const drawer = document.querySelector('#fund-drawer');
+const backdrop = document.querySelector('#drawer-backdrop');
+const drawerTitle = document.querySelector('#drawer-title');
+const drawerCopy = document.querySelector('#drawer-copy');
+const drawerFootnote = document.querySelector('#drawer-footnote');
+const closeDrawer = document.querySelector('.close-drawer');
+const refreshButton = document.querySelector('#refresh-market');
+const syncChainButton = document.querySelector('#sync-chain');
+const fundButton = document.querySelector('#fund-action');
+const fundButtonText = document.querySelector('#fund-action-text');
+const fundAmount = document.querySelector('#fund-amount');
+const receiptStatus = document.querySelector('#receipt-status');
+const receiptStatusText = document.querySelector('#receipt-status-text');
+const receiptPrincipal = document.querySelector('#receipt-principal');
+const receiptRepayment = document.querySelector('#receipt-repayment');
+const receiptClaim = document.querySelector('#receipt-claim');
+const proofState = document.querySelector('#proof-state');
+
+function renderIcons() {
+  if (window.lucide) window.lucide.createIcons({ attrs: { 'stroke-width': 1.6 } });
+}
+
+function setButton(button, text, disabled) {
+  button.disabled = disabled;
+  if (button === fundButton) fundButtonText.textContent = text;
+}
+
+function formatCUSDT(amount) {
+  const whole = amount / 1_000_000n;
+  const fraction = (amount % 1_000_000n).toString().padStart(6, '0').replace(/0+$/, '');
+  return `${whole.toLocaleString()}${fraction ? `.${fraction}` : ''} cUSDT`;
+}
+
+function encodeWord(value) {
+  return BigInt(value).toString(16).padStart(64, '0');
+}
+
+function encodeAddress(address) {
+  if (!/^0x[a-fA-F0-9]{40}$/.test(address)) throw new Error('Invalid contract address');
+  return address.slice(2).toLowerCase().padStart(64, '0');
+}
+
+async function readReceipt() {
+  const response = await fetch(`/v1/chain/receipts/${CONTRACTS.receiptId}`, { headers: { Accept: 'application/json' } });
+  const payload = await response.json();
+  if (!response.ok || !payload.receipt) throw new Error(payload.error?.message || 'Testnet receipt read failed');
+  return {
+    ...payload.receipt,
+    id: BigInt(payload.receipt.id),
+    principal: BigInt(payload.receipt.principal),
+    repayment: BigInt(payload.receipt.repayment),
+    totalFunded: BigInt(payload.receipt.totalFunded)
+  };
+}
+
+function renderReceipt() {
+  if (!state.receipt) {
+    proofState.dataset.state = 'error';
+    receiptStatus.className = 'status status-review';
+    receiptStatusText.textContent = state.receiptError ? `Receipt unavailable: ${state.receiptError}` : 'Receipt unavailable';
+    receiptPrincipal.textContent = '--';
+    receiptRepayment.textContent = '--';
+    receiptClaim.textContent = '--';
+    return;
+  }
+
+  const status = RECEIVABLE_STATUS[state.receipt.status] || 'Unknown';
+  const settled = state.receipt.status === 3;
+  proofState.dataset.state = settled ? 'settled' : 'open';
+  receiptStatus.className = `status ${settled ? 'status-approved' : 'status-neutral'}`;
+  receiptStatusText.textContent = `Receipt #${state.receipt.id} ${status}`;
+  receiptPrincipal.textContent = formatCUSDT(state.receipt.totalFunded);
+  receiptRepayment.textContent = formatCUSDT(state.receipt.repayment);
+  receiptClaim.textContent = settled ? 'Completed' : 'Pending';
+  renderFundingState();
+}
+
+function renderFundingState() {
+  const canFund = state.receipt && state.receipt.status === 1 && state.receipt.totalFunded < state.receipt.principal;
+  if (!state.account) {
+    drawerCopy.textContent = 'Connect a wallet to inspect the deployed Testnet receipt. Funding is enabled only while a receipt is open.';
+    setButton(fundButton, 'Connect wallet to continue', false);
+    return;
+  }
+  if (!canFund) {
+    drawerCopy.textContent = 'Receipt #1 is settled and can no longer accept funding. New verified opportunities will unlock wallet funding here.';
+    setButton(fundButton, 'Receipt settled', true);
+    return;
+  }
+  drawerCopy.textContent = 'This Testnet receipt is open. Your wallet will approve cUSDT first, then submit a separate funding transaction.';
+  setButton(fundButton, state.pending ? 'Wallet confirmation in progress' : 'Approve and fund', state.pending);
+}
+
+async function refreshContractState() {
+  syncChainButton.setAttribute('aria-busy', 'true');
+  try {
+    state.receipt = await readReceipt();
+    state.receiptError = null;
+  } catch (error) {
+    state.receipt = null;
+    state.receiptError = typeof error.message === 'string' ? error.message.slice(0, 100) : 'Unknown receipt read error';
+  } finally {
+    renderReceipt();
+    syncChainButton.removeAttribute('aria-busy');
+  }
+}
+
+function openFundDrawer(event) {
+  const name = event.currentTarget.dataset.receivable ?? 'this opportunity';
+  drawerTitle.textContent = `Fund ${name}`;
+  drawer.classList.add('open');
+  drawer.setAttribute('aria-hidden', 'false');
+  backdrop.hidden = false;
+  fundAmount.focus();
+  renderFundingState();
+}
+
+function closeFundDrawer() {
+  drawer.classList.remove('open');
+  drawer.setAttribute('aria-hidden', 'true');
+  backdrop.hidden = true;
+}
+
+async function ensureTestnet() {
+  const provider = window.ethereum;
+  if (!provider) throw new Error('No EVM wallet was found');
+  let chainId = await requestWallet('read network', 'eth_chainId');
+  if (chainId.toLowerCase() === TESTNET.chainId) return;
+  try {
+    await requestWallet('switch network', 'wallet_switchEthereumChain', [{ chainId: TESTNET.chainId }]);
+  } catch (error) {
+    const unknownChain = error.code === 4902 || /unrecognized chain id|unknown chain/i.test(error.message);
+    if (!unknownChain) throw error;
+    await requestWallet('add BOT Testnet', 'wallet_addEthereumChain', [TESTNET]);
+    await requestWallet('switch to BOT Testnet', 'wallet_switchEthereumChain', [{ chainId: TESTNET.chainId }]);
+  }
+  chainId = await requestWallet('confirm network', 'eth_chainId');
+  if (chainId.toLowerCase() !== TESTNET.chainId) throw new Error('BOT Testnet was not selected');
+}
+
+async function requestWallet(stage, method, params) {
+  try {
+    return await window.ethereum.request(params ? { method, params } : { method });
+  } catch (error) {
+    const message = typeof error.message === 'string' ? error.message : 'No provider message was returned';
+    const wrapped = new Error(`${stage}: ${message}`);
+    wrapped.code = error.code;
+    throw wrapped;
+  }
+}
+
+function setConnectedAccount(account) {
+  state.account = account;
+  walletButton.querySelector('span').textContent = `${account.slice(0, 6)}...${account.slice(-4)}`;
+  networkStatusText.textContent = 'BOT Testnet connected';
+  renderFundingState();
+}
+
+async function connectWallet() {
+  if (!window.ethereum) {
+    walletButton.querySelector('span').textContent = 'Wallet unavailable';
+    return;
+  }
+  try {
+    const [account] = await requestWallet('request account access', 'eth_requestAccounts');
+    await ensureTestnet();
+    setConnectedAccount(account);
+  } catch (error) {
+    const providerCode = Number.isInteger(error.code) ? ` (${error.code})` : '';
+    const providerMessage = typeof error.message === 'string' ? error.message.slice(0, 120) : 'No provider message was returned';
+    const message = error.code === 4001
+      ? 'Connection declined'
+      : error.code === -32002
+        ? 'Wallet request pending'
+        : error.message === 'BOT Testnet was not selected'
+          ? 'Switch to BOT Testnet'
+          : `Wallet error${providerCode}`;
+    walletButton.querySelector('span').textContent = message;
+    networkStatusText.textContent = message === 'Switch to BOT Testnet' ? 'Wrong network' : 'BOT Testnet';
+    drawerFootnote.textContent = `Wallet provider: ${providerMessage}`;
+  }
+}
+
+function parseCUSDT(value) {
+  const normalized = value.trim();
+  if (!/^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/.test(normalized)) throw new Error('Enter a cUSDT amount with up to 6 decimals');
+  const [whole, fraction = ''] = normalized.split('.');
+  const amount = BigInt(whole) * 1_000_000n + BigInt(fraction.padEnd(6, '0'));
+  if (amount <= 0n) throw new Error('Funding amount must be greater than zero');
+  return amount;
+}
+
+async function waitForReceipt(hash) {
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    const receipt = await window.ethereum.request({ method: 'eth_getTransactionReceipt', params: [hash] });
+    if (receipt) {
+      if (receipt.status !== '0x1') throw new Error('Transaction reverted on BOT Testnet');
+      return receipt;
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, 1500));
+  }
+  throw new Error('Transaction confirmation timed out');
+}
+
+async function submitFunding() {
+  if (!state.account) return connectWallet();
+  if (!state.receipt || state.receipt.status !== 1) return;
+  let amount;
+  try {
+    amount = parseCUSDT(fundAmount.value);
+    if (amount > state.receipt.principal - state.receipt.totalFunded) throw new Error('Amount exceeds the remaining funding capacity');
+    state.pending = true;
+    renderFundingState();
+    await ensureTestnet();
+    const approveHash = await window.ethereum.request({
+      method: 'eth_sendTransaction',
+      params: [{ from: state.account, to: CONTRACTS.token, data: `0x095ea7b3${encodeAddress(CONTRACTS.receivables)}${encodeWord(amount)}` }]
+    });
+    await waitForReceipt(approveHash);
+    const fundHash = await window.ethereum.request({
+      method: 'eth_sendTransaction',
+      params: [{ from: state.account, to: CONTRACTS.receivables, data: `0xe91c4052${encodeWord(state.receipt.id)}${encodeWord(amount)}` }]
+    });
+    await waitForReceipt(fundHash);
+    drawerFootnote.textContent = `Funding confirmed: ${fundHash.slice(0, 10)}...${fundHash.slice(-8)}`;
+    await refreshContractState();
+  } catch (error) {
+    drawerFootnote.textContent = error.code === 4001 ? 'Wallet confirmation was rejected. No funding was submitted.' : error.message || 'Funding could not be completed.';
+  } finally {
+    state.pending = false;
+    renderFundingState();
+  }
+}
+
+async function refreshMarket() {
+  refreshButton.setAttribute('aria-busy', 'true');
+  try {
+    await Promise.all([fetch('/v1/receivables', { headers: { Accept: 'application/json' } }), refreshContractState()]);
+  } catch {
+    // Contract evidence is independently read from the Testnet RPC.
+  } finally {
+    refreshButton.removeAttribute('aria-busy');
+  }
+}
+
+function watchWallet() {
+  if (!window.ethereum?.on) return;
+  window.ethereum.on('accountsChanged', ([account]) => {
+    if (account) setConnectedAccount(account);
+    else {
+      state.account = null;
+      walletButton.querySelector('span').textContent = 'Connect wallet';
+      networkStatusText.textContent = 'BOT Testnet';
+      renderFundingState();
+    }
+  });
+  window.ethereum.on('chainChanged', (chainId) => {
+    if (chainId.toLowerCase() === TESTNET.chainId) {
+      networkStatusText.textContent = state.account ? 'BOT Testnet connected' : 'BOT Testnet';
+    } else {
+      networkStatusText.textContent = 'Wrong network';
+    }
+    renderFundingState();
+  });
+}
+
+document.querySelectorAll('.open-fund').forEach((button) => button.addEventListener('click', openFundDrawer));
+closeDrawer.addEventListener('click', closeFundDrawer);
+backdrop.addEventListener('click', closeFundDrawer);
+walletButton.addEventListener('click', connectWallet);
+refreshButton.addEventListener('click', refreshMarket);
+syncChainButton.addEventListener('click', refreshContractState);
+fundButton.addEventListener('click', submitFunding);
+document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeFundDrawer(); });
+window.addEventListener('load', () => {
+  renderIcons();
+  refreshContractState();
+  watchWallet();
+});
