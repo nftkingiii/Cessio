@@ -24,7 +24,7 @@ async function withServer(config, callback, chainReader) {
 }
 
 const baseConfig = {
-  allowedOrigins: ['http://localhost:5173'],
+  allowedOrigins: ['http://localhost:5173', 'https://cessio.up.railway.app'],
   underwritingProvider: 'deterministic',
   allowUnauthenticatedWrites: false
 };
