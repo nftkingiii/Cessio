@@ -1,5 +1,6 @@
 :root { --ink:#101211; --panel:#171a18; --line:#303631; --muted:#9da59e; --paper:#f3f6f1; --signal:#9bed63; --blue:#88abff; --amber:#e9bd5f; --danger:#e06a68; --font:Manrope,Arial,sans-serif; --mono:"DM Mono",monospace; }
 * { box-sizing:border-box; }
+[hidden] { display:none !important; }
 html { scroll-behavior:smooth; }
 body { margin:0; min-width:320px; overflow-x:hidden; background:#101211; color:var(--paper); font-family:var(--font); }
 button,input { font:inherit; }
