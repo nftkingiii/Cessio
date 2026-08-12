@@ -51,8 +51,12 @@ const portfolioReceipt = document.querySelector('#portfolio-receipt');
 const portfolioReceiptState = document.querySelector('#portfolio-receipt-state');
 const portfolioFunded = document.querySelector('#portfolio-funded');
 const portfolioRepayment = document.querySelector('#portfolio-repayment');
+const portfolioConnect = document.querySelector('#portfolio-connect');
+const portfolioActivity = document.querySelector('#portfolio-activity');
+const opportunitiesBody = document.querySelector('#opportunities-body');
 let latestDemo = null;
 let latestDemoReceiptId = null;
+let activity = JSON.parse(localStorage.getItem('cessio-funding-activity') || '[]');
 
 function renderIcons() {
   if (window.lucide) window.lucide.createIcons({ attrs: { 'stroke-width': 1.6 } });
@@ -176,6 +180,39 @@ function renderPortfolio() {
   portfolioAccount.textContent = state.account ? `${state.account.slice(0, 10)}...${state.account.slice(-8)}` : 'Not connected';
   portfolioNetwork.textContent = state.account ? 'BOT Testnet connected' : 'Connect a wallet to continue';
   portfolioBalance.textContent = state.tokenBalance === null ? '--' : formatCUSDT(state.tokenBalance);
+  portfolioConnect.hidden = Boolean(state.account);
+  portfolioActivity.innerHTML = activity.length
+    ? activity.map((entry) => `<div class="activity-row"><span><strong>${entry.label}</strong><small>${entry.hash}</small></span><b>${entry.amount} cUSDT</b></div>`).join('')
+    : '<span class="portfolio-empty">No funding activity recorded in this browser yet.</span>';
+}
+
+function seedOpportunityRows() {
+  return `<tr><td><strong>Atlas Compute</strong><span>Compute provider</span></td><td>GPU capacity invoice</td><td>$1,000</td><td><span class="risk-pill low">Low · 18</span></td><td>20d</td><td><div class="mini-progress"><span style="width:64%"></span></div><span class="mono">64%</span></td><td><button class="icon-button open-fund" data-receivable="Atlas Compute" aria-label="Fund Atlas Compute"><i data-lucide="arrow-up-right"></i></button></td></tr>`;
+}
+
+function renderOpportunityRows(receivables = []) {
+  const rows = receivables.map((entry) => {
+    const invoice = entry.invoice || {};
+    const decision = entry.underwriting || {};
+    const label = invoice.obligorName || 'Testnet originator';
+    const amount = Number(entry.requestedFundingAmount || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
+    const risk = Number(decision.riskScore ?? 0);
+    const riskClass = risk <= 30 ? 'low' : 'review';
+    return `<tr><td><strong>${label}</strong><span>${invoice.serviceCategory || 'Receivable'}</span></td><td>${invoice.invoiceReference || 'Demo invoice'}</td><td>$${amount}</td><td><span class="risk-pill ${riskClass}">${riskClass === 'low' ? 'Low' : 'Review'} · ${risk}</span></td><td>${invoice.dueDate || '--'}</td><td><span class="mono">TESTNET</span></td><td><button class="icon-button open-fund" data-receivable="${label}" aria-label="Fund ${label}"><i data-lucide="arrow-up-right"></i></button></td></tr>`;
+  });
+  opportunitiesBody.innerHTML = rows.length ? rows.join('') : seedOpportunityRows();
+  document.querySelectorAll('#opportunities-body .open-fund').forEach((button) => button.addEventListener('click', openFundDrawer));
+  renderIcons();
+}
+
+async function refreshOpportunities() {
+  try {
+    const response = await fetch('/v1/receivables', { headers: { Accept: 'application/json' } });
+    const payload = await response.json();
+    if (response.ok) renderOpportunityRows(payload.receivables || []);
+  } catch {
+    renderOpportunityRows([]);
+  }
 }
 
 async function refreshWalletBalance() {
@@ -318,6 +355,9 @@ async function submitFunding() {
     });
     await waitForReceipt(fundHash);
     drawerFootnote.textContent = `Funding confirmed: ${fundHash.slice(0, 10)}...${fundHash.slice(-8)}`;
+    activity.unshift({ label: `Receipt #${state.receipt.id} funded`, hash: `${fundHash.slice(0, 10)}...${fundHash.slice(-8)}`, amount: (Number(amount) / 1_000_000).toLocaleString(undefined, { maximumFractionDigits: 6 }) });
+    localStorage.setItem('cessio-funding-activity', JSON.stringify(activity.slice(0, 12)));
+    renderPortfolio();
     await refreshContractState();
     await refreshWalletBalance();
   } catch (error) {
@@ -345,6 +385,7 @@ async function submitDemo(event) {
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error?.message || 'Demo submission failed');
     latestDemo = payload;
+    await refreshOpportunities();
     demoResults.hidden = false;
     demoResultTitle.textContent = payload.assessment.decision.decision === 'approved' ? 'Approved for Testnet registration' : 'Held for review';
     demoResultCopy.textContent = payload.receivable ? `Risk ${payload.assessment.decision.riskScore}/100. Maximum funding: ${payload.assessment.decision.maxFundingAmount} ${invoice.currency}. Register it from the connected underwriter wallet to create the on-chain receipt.` : payload.assessment.decision.reasons.join(' ');
@@ -404,11 +445,24 @@ function setView(view) {
 async function refreshMarket() {
   refreshButton.setAttribute('aria-busy', 'true');
   try {
-    await Promise.all([fetch('/v1/receivables', { headers: { Accept: 'application/json' } }), refreshContractState()]);
+    await Promise.all([refreshOpportunities(), refreshContractState()]);
   } catch {
     // Contract evidence is independently read from the Testnet RPC.
   } finally {
     refreshButton.removeAttribute('aria-busy');
+  }
+}
+
+async function bootstrapWallet() {
+  if (!window.ethereum) return;
+  try {
+    const [account] = await requestWallet('read connected account', 'eth_accounts');
+    if (account) {
+      await ensureTestnet();
+      setConnectedAccount(account);
+    }
+  } catch {
+    // The user can still connect explicitly from the header or Portfolio tab.
   }
 }
 
@@ -448,7 +502,7 @@ fundButton.addEventListener('click', submitFunding);
 demoForm.addEventListener('submit', submitDemo);
 confidenceInput.addEventListener('input', () => { confidenceOutput.value = `${Math.round(Number(confidenceInput.value) * 100)}%`; confidenceOutput.textContent = confidenceOutput.value; });
 registerDemoButton.addEventListener('click', registerDemo);
-fundDemoButton.addEventListener('click', fundDemo);
+  fundDemoButton.addEventListener('click', fundDemo);
 document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeFundDrawer(); });
 window.addEventListener('hashchange', () => setView(window.location.hash.slice(1) || 'market'));
 window.addEventListener('load', () => {
@@ -457,8 +511,10 @@ window.addEventListener('load', () => {
   demoForm.querySelector('[name="issuedDate"]').value = today.toISOString().slice(0, 10);
   demoForm.querySelector('[name="dueDate"]').value = due.toISOString().slice(0, 10);
   renderIcons();
+  renderOpportunityRows([]);
   setView(window.location.hash.slice(1) || 'market');
   renderPortfolio();
-  refreshContractState();
+  refreshMarket();
   watchWallet();
+  bootstrapWallet();
 });

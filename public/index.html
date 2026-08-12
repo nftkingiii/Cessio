@@ -128,7 +128,7 @@
           <div class="table-wrap">
             <table>
               <thead><tr><th>Originator</th><th>Asset</th><th>Target</th><th>Risk</th><th>Term</th><th>Funding</th><th></th></tr></thead>
-              <tbody id="opportunities-body">
+              <tbody id="opportunities-body" data-seeded="true">
                 <tr><td><strong>Atlas Compute</strong><span>Compute provider</span></td><td>GPU capacity invoice</td><td>$1,000</td><td><span class="risk-pill low">Low · 18</span></td><td>20d</td><td><div class="mini-progress"><span style="width:64%"></span></div><span class="mono">64%</span></td><td><button class="icon-button open-fund" data-receivable="Atlas Compute" aria-label="Fund Atlas Compute"><i data-lucide="arrow-up-right"></i></button></td></tr>
                 <tr><td><strong>Northstar Studio</strong><span>Digital production</span></td><td>Rendering services</td><td>$2,400</td><td><span class="risk-pill low">Low · 22</span></td><td>28d</td><td><div class="mini-progress"><span style="width:38%"></span></div><span class="mono">38%</span></td><td><button class="icon-button open-fund" data-receivable="Northstar Studio" aria-label="Fund Northstar Studio"><i data-lucide="arrow-up-right"></i></button></td></tr>
                 <tr><td><strong>Relay Systems</strong><span>Infrastructure</span></td><td>Network operations</td><td>$4,800</td><td><span class="risk-pill review">Review · 46</span></td><td>45d</td><td><div class="mini-progress"><span style="width:12%"></span></div><span class="mono">12%</span></td><td><button class="icon-button open-fund" data-receivable="Relay Systems" aria-label="Fund Relay Systems"><i data-lucide="arrow-up-right"></i></button></td></tr>
@@ -149,6 +149,7 @@
             <article class="portfolio-panel"><p class="eyebrow">Connected wallet</p><strong id="portfolio-account">Not connected</strong><span id="portfolio-network">Connect a wallet to continue</span><button class="button button-quiet" id="portfolio-connect"><i data-lucide="wallet-cards"></i><span>Connect wallet</span></button></article>
             <article class="portfolio-panel"><p class="eyebrow">cUSDT balance</p><strong id="portfolio-balance">--</strong><span>BOT Testnet settlement token</span><button class="text-button" id="portfolio-refresh"><i data-lucide="refresh-cw"></i><span>Refresh balance</span></button></article>
             <article class="portfolio-panel portfolio-wide"><p class="eyebrow">Current receipt</p><strong id="portfolio-receipt">Receipt #1</strong><span id="portfolio-receipt-state">Loading on-chain state</span><div class="portfolio-receipt-data"><span>Funded <b id="portfolio-funded">--</b></span><span>Repayment <b id="portfolio-repayment">--</b></span></div></article>
+            <article class="portfolio-panel portfolio-wide"><div class="section-heading"><div><p class="eyebrow">Activity</p><strong>Funding history</strong></div><span class="mono">THIS WALLET</span></div><div class="portfolio-activity" id="portfolio-activity"><span class="portfolio-empty">No funding activity recorded in this browser yet.</span></div></article>
           </div>
           <p class="portfolio-note"><i data-lucide="info"></i> Testnet demo activity is for product inspection only and is not production volume or user traction.</p>
         </section>
