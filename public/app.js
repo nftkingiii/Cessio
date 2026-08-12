@@ -34,6 +34,18 @@ const receiptPrincipal = document.querySelector('#receipt-principal');
 const receiptRepayment = document.querySelector('#receipt-repayment');
 const receiptClaim = document.querySelector('#receipt-claim');
 const proofState = document.querySelector('#proof-state');
+const demoForm = document.querySelector('#demo-form');
+const demoSubmit = document.querySelector('#demo-submit');
+const demoStatus = document.querySelector('#demo-status');
+const confidenceInput = demoForm.querySelector('[name="deliveryConfidence"]');
+const confidenceOutput = document.querySelector('#confidence-output');
+const demoResults = document.querySelector('#demo-results');
+const demoResultTitle = document.querySelector('#demo-result-title');
+const demoResultCopy = document.querySelector('#demo-result-copy');
+const registerDemoButton = document.querySelector('#register-demo');
+const fundDemoButton = document.querySelector('#fund-demo');
+let latestDemo = null;
+let latestDemoReceiptId = null;
 
 function renderIcons() {
   if (window.lucide) window.lucide.createIcons({ attrs: { 'stroke-width': 1.6 } });
@@ -57,6 +69,24 @@ function encodeWord(value) {
 function encodeAddress(address) {
   if (!/^0x[a-fA-F0-9]{40}$/.test(address)) throw new Error('Invalid contract address');
   return address.slice(2).toLowerCase().padStart(64, '0');
+}
+
+function hexFromBytes(bytes) {
+  return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function sha256Hex(value) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  return hexFromBytes(new Uint8Array(digest));
+}
+
+function encodeBytes32(value) {
+  if (!/^[a-fA-F0-9]{64}$/.test(value)) throw new Error('Expected a bytes32 digest');
+  return value.toLowerCase();
+}
+
+function encodeCreateReceivable({ originator, token, principal, repayment, deadline, invoiceDigest, assessmentDigest }) {
+  return `0xbbd61590${encodeAddress(originator)}${encodeAddress(originator)}${encodeAddress(token)}${encodeWord(principal)}${encodeWord(repayment)}${encodeWord(deadline)}${encodeBytes32(invoiceDigest)}${encodeBytes32(assessmentDigest)}`;
 }
 
 async function readReceipt() {
@@ -251,6 +281,76 @@ async function submitFunding() {
   }
 }
 
+async function submitDemo(event) {
+  event.preventDefault();
+  if (!state.account) return connectWallet();
+  const form = new FormData(demoForm);
+  const invoice = Object.fromEntries(form.entries());
+  invoice.originatorWallet = state.account;
+  invoice.currency = 'USD';
+  invoice.deliveryConfidence = Number(invoice.deliveryConfidence);
+  invoice.evidenceDigest = await sha256Hex(JSON.stringify({ reference: invoice.invoiceReference, confidence: invoice.deliveryConfidence, category: invoice.serviceCategory }));
+  demoSubmit.disabled = true;
+  demoStatus.className = 'form-status';
+  demoStatus.textContent = 'Running bounded Testnet underwriting...';
+  try {
+    const response = await fetch('/v1/demo/receivables', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(invoice) });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error?.message || 'Demo submission failed');
+    latestDemo = payload;
+    demoResults.hidden = false;
+    demoResultTitle.textContent = payload.assessment.decision.decision === 'approved' ? 'Approved for Testnet registration' : 'Held for review';
+    demoResultCopy.textContent = payload.receivable ? `Risk ${payload.assessment.decision.riskScore}/100. Maximum funding: ${payload.assessment.decision.maxFundingAmount} ${invoice.currency}. Register it from the connected underwriter wallet to create the on-chain receipt.` : payload.assessment.decision.reasons.join(' ');
+    registerDemoButton.disabled = !payload.receivable;
+    demoStatus.className = 'form-status success';
+    demoStatus.textContent = 'Underwriting complete. Review the decision before registering on-chain.';
+  } catch (error) {
+    demoStatus.className = 'form-status error';
+    demoStatus.textContent = error.message || 'Demo submission failed';
+  } finally {
+    demoSubmit.disabled = false;
+  }
+}
+
+async function registerDemo() {
+  if (!latestDemo?.receivable || !state.account) return connectWallet();
+  registerDemoButton.disabled = true;
+  try {
+    const nextIdData = await requestWallet('read next receipt ID', 'eth_call', [{ to: CONTRACTS.receivables, data: '0x0ae3cd24' }, 'latest']);
+    latestDemoReceiptId = BigInt(nextIdData);
+    const amount = parseCUSDT(latestDemo.receivable.requestedFundingAmount);
+    const repayment = amount + (amount * BigInt(latestDemo.assessment.decision.expectedYieldBps)) / 10_000n;
+    const deadline = BigInt(Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60);
+    const invoiceDigest = latestDemo.assessment.invoice.evidenceDigest;
+    const assessmentDigest = await sha256Hex(JSON.stringify(latestDemo.assessment.decision));
+    const hash = await requestWallet('register receivable', 'eth_sendTransaction', [{ from: state.account, to: CONTRACTS.receivables, data: encodeCreateReceivable({ originator: state.account, token: CONTRACTS.token, principal: amount, repayment, deadline, invoiceDigest, assessmentDigest }) }]);
+    await waitForReceipt(hash);
+    demoResultCopy.textContent = `Registered on BOT Testnet: ${hash.slice(0, 12)}...${hash.slice(-8)}. You can now approve cUSDT and fund this receipt from the connected wallet.`;
+    fundDemoButton.disabled = false;
+    fundDemoButton.dataset.receiptId = latestDemoReceiptId.toString();
+  } catch (error) {
+    demoResultCopy.textContent = error.message || 'Registration failed';
+    registerDemoButton.disabled = false;
+  }
+}
+
+async function fundDemo() {
+  if (!latestDemo || latestDemoReceiptId === null) return;
+  const amount = parseCUSDT(latestDemo.receivable.requestedFundingAmount);
+  fundDemoButton.disabled = true;
+  try {
+    await ensureTestnet();
+    const approveHash = await requestWallet('approve demo funding', 'eth_sendTransaction', [{ from: state.account, to: CONTRACTS.token, data: `0x095ea7b3${encodeAddress(CONTRACTS.receivables)}${encodeWord(amount)}` }]);
+    await waitForReceipt(approveHash);
+    const fundHash = await requestWallet('fund demo receipt', 'eth_sendTransaction', [{ from: state.account, to: CONTRACTS.receivables, data: `0xe91c4052${encodeWord(latestDemoReceiptId)}${encodeWord(amount)}` }]);
+    await waitForReceipt(fundHash);
+    demoResultCopy.textContent = `Funding confirmed on BOT Testnet: ${fundHash.slice(0, 12)}...${fundHash.slice(-8)}. The receipt is now independently readable from the chain.`;
+  } catch (error) {
+    demoResultCopy.textContent = error.message || 'Funding failed';
+    fundDemoButton.disabled = false;
+  }
+}
+
 async function refreshMarket() {
   refreshButton.setAttribute('aria-busy', 'true');
   try {
@@ -290,8 +390,16 @@ walletButton.addEventListener('click', connectWallet);
 refreshButton.addEventListener('click', refreshMarket);
 syncChainButton.addEventListener('click', refreshContractState);
 fundButton.addEventListener('click', submitFunding);
+demoForm.addEventListener('submit', submitDemo);
+confidenceInput.addEventListener('input', () => { confidenceOutput.value = `${Math.round(Number(confidenceInput.value) * 100)}%`; confidenceOutput.textContent = confidenceOutput.value; });
+registerDemoButton.addEventListener('click', registerDemo);
+fundDemoButton.addEventListener('click', fundDemo);
 document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeFundDrawer(); });
 window.addEventListener('load', () => {
+  const today = new Date();
+  const due = new Date(today.getTime() + 20 * 24 * 60 * 60 * 1000);
+  demoForm.querySelector('[name="issuedDate"]').value = today.toISOString().slice(0, 10);
+  demoForm.querySelector('[name="dueDate"]').value = due.toISOString().slice(0, 10);
   renderIcons();
   refreshContractState();
   watchWallet();

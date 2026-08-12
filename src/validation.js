@@ -67,6 +67,10 @@ export function parseAssessmentRequest(input) {
   };
 }
 
+export function parseDemoInvoiceRequest(input) {
+  return parseAssessmentRequest(input);
+}
+
 export function parseReceivableRequest(input) {
   const body = object(input, 'body');
   return {

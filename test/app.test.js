@@ -72,3 +72,28 @@ test('runs the testnet development underwriting flow when explicitly enabled', a
     assert.equal((await response.json()).assessment.decision.decision, 'approved');
   });
 });
+
+test('creates an approved Testnet demo receivable without enabling general writes', async () => {
+  await withServer({ ...baseConfig, demoMode: true }, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/v1/demo/receivables`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        originatorWallet: '0x1111111111111111111111111111111111111111',
+        obligorName: 'Demo Compute Ltd',
+        invoiceReference: 'DEMO-2026-001',
+        invoiceAmount: '1000.00',
+        currency: 'USD',
+        issuedDate: '2026-08-10',
+        dueDate: '2026-08-30',
+        serviceCategory: 'GPU compute',
+        evidenceDigest: 'b'.repeat(64),
+        deliveryConfidence: 0.96
+      })
+    });
+    const payload = await response.json();
+    assert.equal(response.status, 201);
+    assert.equal(payload.assessment.decision.decision, 'approved');
+    assert.equal(payload.receivable.chainId, 968);
+  });
+});

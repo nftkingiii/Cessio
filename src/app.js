@@ -1,4 +1,4 @@
-import { parseAssessmentRequest, parseChainEventRequest, parseReceivableRequest, ValidationError } from './validation.js';
+import { parseAssessmentRequest, parseChainEventRequest, parseDemoInvoiceRequest, parseReceivableRequest, ValidationError } from './validation.js';
 import { isDomainError } from './service.js';
 
 const MAX_BODY_BYTES = 64 * 1024;
@@ -19,7 +19,7 @@ export function createApp({ config, service, chainReader }) {
     try {
       const url = new URL(request.url, 'http://localhost');
       if (request.method === 'GET' && url.pathname === '/health') {
-        return send(response, 200, { status: 'ok', service: 'cessio-api', underwritingProvider: config.underwritingProvider, unauthenticatedWritesEnabled: config.allowUnauthenticatedWrites }, requestId);
+        return send(response, 200, { status: 'ok', service: 'cessio-api', underwritingProvider: config.underwritingProvider, demoMode: config.demoMode, unauthenticatedWritesEnabled: config.allowUnauthenticatedWrites }, requestId);
       }
       const chainReceiptMatch = url.pathname.match(/^\/v1\/chain\/receipts\/([1-9]\d*)$/);
       if (request.method === 'GET' && chainReceiptMatch) {
@@ -28,7 +28,17 @@ export function createApp({ config, service, chainReader }) {
       }
 
       if (isWrite(request.method) && !config.allowUnauthenticatedWrites) {
+        if (request.method === 'POST' && url.pathname === '/v1/demo/receivables' && config.demoMode) {
+          const result = await service.createDemoReceivable(parseDemoInvoiceRequest(await readJson(request)));
+          return send(response, 201, result, requestId);
+        }
         return send(response, 503, { error: { code: 'AUTH_REQUIRED', message: 'Write operations are disabled until wallet authentication is configured' } }, requestId);
+      }
+
+      if (request.method === 'POST' && url.pathname === '/v1/demo/receivables') {
+        if (!config.demoMode) return send(response, 404, { error: { code: 'NOT_FOUND', message: 'Demo mode is disabled' } }, requestId);
+        const result = await service.createDemoReceivable(parseDemoInvoiceRequest(await readJson(request)));
+        return send(response, 201, result, requestId);
       }
 
       if (request.method === 'POST' && url.pathname === '/v1/underwriting/assessments') {

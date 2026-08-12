@@ -25,6 +25,20 @@ export class CessioService {
     return assessment;
   }
 
+  async createDemoReceivable(invoice) {
+    const assessment = await this.createAssessment(invoice);
+    if (assessment.decision.decision !== 'approved') return { assessment, receivable: null };
+    const requestedFundingAmount = Math.min(Number(invoice.invoiceAmount), Number(assessment.decision.maxFundingAmount)).toFixed(6);
+    const receivable = await this.createReceivable({
+      assessmentId: assessment.id,
+      originatorWallet: invoice.originatorWallet,
+      settlementToken: '0x4D0984B958b4376dE072DC098404c4afA9155C90',
+      chainId: 968,
+      requestedFundingAmount
+    });
+    return { assessment, receivable };
+  }
+
   async createReceivable(input) {
     return this.repository.transact((state) => {
       const assessment = state.assessments.find((entry) => entry.id === input.assessmentId);

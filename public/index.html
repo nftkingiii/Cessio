@@ -68,6 +68,32 @@
           </div>
         </section>
 
+        <section class="demo-desk" id="demo-desk" aria-labelledby="demo-title">
+          <div class="demo-copy">
+            <p class="eyebrow">Testnet demo desk <span>LIVE</span></p>
+            <h2 id="demo-title">Create a receivable to inspect.</h2>
+            <p>Use a connected Testnet wallet to submit a clearly labeled demo invoice. Cessio will underwrite it, create the marketplace record, and prepare the on-chain registration step.</p>
+            <span class="demo-note"><i data-lucide="flask-conical"></i> Testnet activity only. Demo activity is not user traction or production volume.</span>
+          </div>
+          <form class="demo-form" id="demo-form">
+            <div class="form-grid">
+              <label>Obligor name<input name="obligorName" value="Atlas Compute Ltd" maxlength="120" required /></label>
+              <label>Invoice reference<input name="invoiceReference" value="AC-2026-002" maxlength="80" required /></label>
+              <label>Invoice amount<input name="invoiceAmount" type="number" min="1" step="0.01" value="1000" required /></label>
+              <label>Service category<input name="serviceCategory" value="GPU compute" maxlength="80" required /></label>
+              <label>Issued date<input name="issuedDate" type="date" required /></label>
+              <label>Due date<input name="dueDate" type="date" required /></label>
+            </div>
+            <label>Delivery evidence confidence <span class="range-row"><input name="deliveryConfidence" type="range" min="0" max="1" step="0.01" value="0.96" /><output id="confidence-output">96%</output></span></label>
+            <button class="button button-primary" type="submit" id="demo-submit"><span>Underwrite demo invoice</span><i data-lucide="arrow-up-right"></i></button>
+            <p class="form-status" id="demo-status" role="status"></p>
+          </form>
+        </section>
+        <section class="demo-results" id="demo-results" aria-live="polite" hidden>
+          <div><p class="eyebrow">Latest demo receivable</p><h2 id="demo-result-title">Awaiting submission</h2><p id="demo-result-copy"></p></div>
+          <div class="demo-result-actions"><button class="button button-quiet" id="register-demo" disabled><span>Register on BOT Testnet</span><i data-lucide="blocks"></i></button><button class="button button-primary" id="fund-demo" disabled><span>Fund after registration</span><i data-lucide="wallet-cards"></i></button></div>
+        </section>
+
         <section class="featured-grid" aria-labelledby="featured-title">
           <article class="featured-receivable">
             <div class="featured-media" role="img" aria-label="Monochrome server infrastructure"></div>
