@@ -21,9 +21,10 @@
       <header class="topbar">
         <a class="brand" href="#market" aria-label="Cessio market home"><img class="brand-mark" src="/brand/cessio-logo.png" alt="" /><span>Cessio</span></a>
         <nav aria-label="Primary navigation">
-          <a class="active" href="#market">Market</a>
-          <a href="#portfolio">Portfolio</a>
-          <a href="#submit">Submit</a>
+          <a class="active" href="#market" data-view="market">Market</a>
+          <a href="#opportunities" data-view="opportunities">Opportunities</a>
+          <a href="#portfolio" data-view="portfolio">Portfolio</a>
+          <a href="#create" data-view="create">Create invoice</a>
         </nav>
         <div class="topbar-actions">
           <span class="network-status" id="network-status"><span></span><span id="network-status-text">BOT Testnet</span></span>
@@ -32,7 +33,7 @@
       </header>
 
       <main id="market">
-        <section class="market-intro">
+        <section class="market-intro" data-view-panel="market">
           <div>
             <p class="eyebrow">Receivables market <span>01</span></p>
             <h1>Capital, backed<br />by <em>proof.</em></h1>
@@ -40,14 +41,14 @@
           <p class="intro-copy">Fund verified compute and digital-service invoices. Underwriting decisions, evidence references, and settlement activity are recorded in one auditable flow.</p>
         </section>
 
-        <section class="metrics" aria-label="Market metrics">
+        <section class="metrics" aria-label="Market metrics" data-view-panel="market">
           <article><span>Funding available</span><strong>$15,740</strong><small>USDT settlement</small></article>
           <article><span>Verified receipt</span><strong>#1</strong><small>Repaid on BOT Testnet</small></article>
           <article><span>Median term</span><strong>21d</strong><small>Invoice issue to due date</small></article>
           <article><span>On-chain settlement</span><strong>0.9s</strong><small>BOT Chain finality target</small></article>
         </section>
 
-        <section class="chain-proof" aria-labelledby="proof-title">
+        <section class="chain-proof" aria-labelledby="proof-title" data-view-panel="market">
           <div class="proof-intro">
             <p class="eyebrow">Contract evidence <span>968</span></p>
             <h2 id="proof-title">Testnet receipt, readable on-chain.</h2>
@@ -68,7 +69,7 @@
           </div>
         </section>
 
-        <section class="demo-desk" id="demo-desk" aria-labelledby="demo-title">
+        <section class="demo-desk" id="demo-desk" aria-labelledby="demo-title" data-view-panel="create">
           <div class="demo-copy">
             <p class="eyebrow">Testnet demo desk <span>LIVE</span></p>
             <h2 id="demo-title">Create a receivable to inspect.</h2>
@@ -89,12 +90,12 @@
             <p class="form-status" id="demo-status" role="status"></p>
           </form>
         </section>
-        <section class="demo-results" id="demo-results" aria-live="polite" hidden>
+        <section class="demo-results" id="demo-results" aria-live="polite" data-view-panel="create" hidden>
           <div><p class="eyebrow">Latest demo receivable</p><h2 id="demo-result-title">Awaiting submission</h2><p id="demo-result-copy"></p></div>
           <div class="demo-result-actions"><button class="button button-quiet" id="register-demo" disabled><span>Register on BOT Testnet</span><i data-lucide="blocks"></i></button><button class="button button-primary" id="fund-demo" disabled><span>Fund after registration</span><i data-lucide="wallet-cards"></i></button></div>
         </section>
 
-        <section class="featured-grid" aria-labelledby="featured-title">
+        <section class="featured-grid" aria-labelledby="featured-title" data-view-panel="market">
           <article class="featured-receivable">
             <div class="featured-media" role="img" aria-label="Monochrome server infrastructure"></div>
             <div class="featured-copy">
@@ -122,8 +123,8 @@
           </aside>
         </section>
 
-        <section class="market-table-section" aria-labelledby="opportunities-title">
-          <div class="section-heading"><div><p class="eyebrow">Market preview <span>03</span></p><h2 id="opportunities-title">Illustrative opportunities</h2></div><button class="text-button" id="refresh-market"><i data-lucide="refresh-cw"></i><span>Refresh</span></button></div>
+        <section class="market-table-section" id="opportunities" aria-labelledby="opportunities-title" data-view-panel="opportunities">
+          <div class="section-heading"><div><p class="eyebrow">Funding market <span>03</span></p><h2 id="opportunities-title">Testnet opportunities</h2></div><button class="text-button" id="refresh-market"><i data-lucide="refresh-cw"></i><span>Refresh</span></button></div>
           <div class="table-wrap">
             <table>
               <thead><tr><th>Originator</th><th>Asset</th><th>Target</th><th>Risk</th><th>Term</th><th>Funding</th><th></th></tr></thead>
@@ -136,10 +137,20 @@
           </div>
         </section>
 
-        <section class="workflow-strip" id="submit" aria-label="Cessio settlement lifecycle">
+        <section class="workflow-strip" id="submit" aria-label="Cessio settlement lifecycle" data-view-panel="market">
           <p class="eyebrow">Settlement lifecycle</p>
           <ol><li><span>01</span>Assess</li><li><span>02</span>Issue</li><li><span>03</span>Fund</li><li><span>04</span>Repay</li><li><span>05</span>Claim</li></ol>
           <a href="#market" class="text-button">See market evidence <i data-lucide="arrow-up-right"></i></a>
+        </section>
+
+        <section class="portfolio-view" id="portfolio" aria-labelledby="portfolio-title" data-view-panel="portfolio">
+          <div class="view-heading"><p class="eyebrow">Wallet workspace <span>02</span></p><h2 id="portfolio-title">Your Cessio portfolio.</h2><p>Track the connected wallet, available cUSDT, and the current on-chain receipt without mixing portfolio state into the funding workflow.</p></div>
+          <div class="portfolio-grid">
+            <article class="portfolio-panel"><p class="eyebrow">Connected wallet</p><strong id="portfolio-account">Not connected</strong><span id="portfolio-network">Connect a wallet to continue</span><button class="button button-quiet" id="portfolio-connect"><i data-lucide="wallet-cards"></i><span>Connect wallet</span></button></article>
+            <article class="portfolio-panel"><p class="eyebrow">cUSDT balance</p><strong id="portfolio-balance">--</strong><span>BOT Testnet settlement token</span><button class="text-button" id="portfolio-refresh"><i data-lucide="refresh-cw"></i><span>Refresh balance</span></button></article>
+            <article class="portfolio-panel portfolio-wide"><p class="eyebrow">Current receipt</p><strong id="portfolio-receipt">Receipt #1</strong><span id="portfolio-receipt-state">Loading on-chain state</span><div class="portfolio-receipt-data"><span>Funded <b id="portfolio-funded">--</b></span><span>Repayment <b id="portfolio-repayment">--</b></span></div></article>
+          </div>
+          <p class="portfolio-note"><i data-lucide="info"></i> Testnet demo activity is for product inspection only and is not production volume or user traction.</p>
         </section>
       </main>
     </div>
