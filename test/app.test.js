@@ -97,3 +97,17 @@ test('creates an approved Testnet demo receivable without enabling general write
     assert.equal(payload.receivable.chainId, 968);
   });
 });
+
+test('allows the production Cessio origin for browser writes', async () => {
+  await withServer({ ...baseConfig, demoMode: true }, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/v1/demo/receivables`, {
+      method: 'OPTIONS',
+      headers: {
+        Origin: 'https://cessio.up.railway.app',
+        'Access-Control-Request-Method': 'POST'
+      }
+    });
+    assert.equal(response.status, 204);
+    assert.equal(response.headers.get('access-control-allow-origin'), 'https://cessio.up.railway.app');
+  });
+});

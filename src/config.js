@@ -6,10 +6,11 @@ export function loadConfig(env = process.env) {
     throw new Error('PORT must be a valid TCP port');
   }
 
-  const allowedOrigins = (env.ALLOWED_ORIGINS ?? 'http://localhost:5173,http://localhost:3000')
+  const configuredOrigins = (env.ALLOWED_ORIGINS ?? 'http://localhost:5173,http://localhost:3000')
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
+  const allowedOrigins = [...new Set([...configuredOrigins, 'https://cessio.up.railway.app'])];
 
   return Object.freeze({
     port,
