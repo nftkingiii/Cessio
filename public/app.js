@@ -13,7 +13,7 @@ const CONTRACTS = Object.freeze({
 });
 
 const RECEIVABLE_STATUS = ['Unissued', 'Funding', 'Funded', 'Repaid', 'Cancelled'];
-const state = { account: null, receipt: null, receiptId: 1n, receiptError: null, tokenBalance: null, pending: false };
+const state = { account: null, authToken: null, receipt: null, receiptId: 1n, receiptError: null, tokenBalance: null, pending: false };
 
 const walletButton = document.querySelector('#connect-wallet');
 const networkStatusText = document.querySelector('#network-status-text');
@@ -278,10 +278,28 @@ async function requestWallet(stage, method, params) {
   }
 }
 
+async function authenticateWallet(account) {
+  const nonceResponse = await fetch(`/v1/auth/nonce/${account}`);
+  const noncePayload = await nonceResponse.json();
+  if (!nonceResponse.ok) throw new Error(noncePayload.error?.message || 'Could not start wallet sign-in');
+  const message = `Cessio wallet sign-in\nAddress: ${account.toLowerCase()}\nNonce: ${noncePayload.nonce}\nThis signature does not authorize token transfers.`;
+  const signature = await requestWallet('sign in with wallet', 'personal_sign', [message, account]);
+  const verifyResponse = await fetch('/v1/auth/verify', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ address: account, message, signature }) });
+  const verifyPayload = await verifyResponse.json();
+  if (!verifyResponse.ok) throw new Error(verifyPayload.error?.message || 'Wallet sign-in failed');
+  state.authToken = verifyPayload.token;
+}
+
+function authHeaders() {
+  return state.authToken ? { 'X-Cessio-Token': state.authToken } : {};
+}
+
 function setConnectedAccount(account) {
   state.account = account;
+  state.authToken = null;
   walletButton.querySelector('span').textContent = `${account.slice(0, 6)}...${account.slice(-4)}`;
   networkStatusText.textContent = 'BOT Testnet connected';
+  authenticateWallet(account).then(() => renderPortfolio()).catch((error) => { drawerFootnote.textContent = error.message || 'Wallet sign-in failed'; });
   renderPortfolio();
   refreshWalletBalance();
   renderFundingState();
@@ -333,12 +351,12 @@ async function waitForReceipt(hash) {
   throw new Error('Transaction confirmation timed out');
 }
 
-async function recordChainEvent(receivableId, type, txHash) {
+async function recordChainEvent(receivableId, type, txHash, chainReceiptId = null) {
   if (!receivableId || !txHash) return;
   const response = await fetch(`/v1/receivables/${receivableId}/chain-events`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ type, txHash, chainId: 968, contractAddress: CONTRACTS.receivables })
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...authHeaders() },
+    body: JSON.stringify({ type, txHash, chainId: 968, contractAddress: CONTRACTS.receivables, chainReceiptId })
   });
   if (!response.ok) drawerFootnote.textContent = 'Transaction succeeded, but Cessio could not save its evidence record.';
 }
@@ -366,7 +384,7 @@ async function submitFunding() {
       params: [{ from: state.account, to: CONTRACTS.receivables, data: `0xe91c4052${encodeWord(state.receipt.id)}${encodeWord(amount)}` }]
     });
     await waitForReceipt(fundHash);
-    await recordChainEvent(latestDemo?.receivable?.id, 'funded', fundHash);
+    await recordChainEvent(latestDemo?.receivable?.id, 'funded', fundHash, state.receipt?.id);
     drawerFootnote.textContent = `Funding confirmed: ${fundHash.slice(0, 10)}...${fundHash.slice(-8)}`;
     activity.unshift({ receiptId: state.receipt.id.toString(), label: `Receipt #${state.receipt.id} funded`, hash: `${fundHash.slice(0, 10)}...${fundHash.slice(-8)}`, amount: (Number(amount) / 1_000_000).toLocaleString(undefined, { maximumFractionDigits: 6 }) });
     localStorage.setItem('cessio-funding-activity', JSON.stringify(activity.slice(0, 12)));
@@ -384,6 +402,10 @@ async function submitFunding() {
 async function submitDemo(event) {
   event.preventDefault();
   if (!state.account) return connectWallet();
+  if (!state.authToken) {
+    demoStatus.textContent = 'Sign the wallet message to continue...';
+    try { await authenticateWallet(state.account); } catch (error) { demoStatus.className = 'form-status error'; demoStatus.textContent = error.message || 'Wallet sign-in failed'; return; }
+  }
   const form = new FormData(demoForm);
   const invoice = Object.fromEntries(form.entries());
   invoice.originatorWallet = state.account;
@@ -394,7 +416,7 @@ async function submitDemo(event) {
   demoStatus.className = 'form-status';
   demoStatus.textContent = 'Running bounded Testnet underwriting...';
   try {
-    const response = await fetch('/v1/demo/receivables', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(invoice) });
+    const response = await fetch('/v1/demo/receivables', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...authHeaders() }, body: JSON.stringify(invoice) });
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error?.message || 'Demo submission failed');
     latestDemo = payload;
@@ -426,7 +448,7 @@ async function registerDemo() {
     const assessmentDigest = await sha256Hex(JSON.stringify(latestDemo.assessment.decision));
     const hash = await requestWallet('register receivable', 'eth_sendTransaction', [{ from: state.account, to: CONTRACTS.receivables, data: encodeCreateReceivable({ originator: state.account, token: CONTRACTS.token, principal: amount, repayment, deadline, invoiceDigest, assessmentDigest }) }]);
     await waitForReceipt(hash);
-    await recordChainEvent(latestDemo.receivable.id, 'receivable_registered', hash);
+    await recordChainEvent(latestDemo.receivable.id, 'receivable_registered', hash, latestDemoReceiptId);
     state.receipt = await readReceipt(latestDemoReceiptId);
     state.receiptId = latestDemoReceiptId;
     state.receiptError = null;

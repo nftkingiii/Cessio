@@ -89,7 +89,9 @@ export function parseChainEventRequest(input) {
   if (!allowedTypes.has(type)) throw new ValidationError('type is not supported');
   const txHash = text(body.txHash, 'txHash', { min: 66, max: 66 });
   if (!hashPattern.test(txHash)) throw new ValidationError('txHash must be a transaction hash');
-  return { type, txHash, chainId: parseChainId(body.chainId), contractAddress: parseWallet(body.contractAddress, 'contractAddress') };
+  const chainReceiptId = body.chainReceiptId === undefined ? null : Number(body.chainReceiptId);
+  if (chainReceiptId !== null && (!Number.isSafeInteger(chainReceiptId) || chainReceiptId < 1)) throw new ValidationError('chainReceiptId must be a positive integer');
+  return { type, txHash, chainId: parseChainId(body.chainId), contractAddress: parseWallet(body.contractAddress, 'contractAddress'), chainReceiptId };
 }
 
 function parseWallet(value, name) {
