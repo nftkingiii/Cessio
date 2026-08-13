@@ -18,6 +18,7 @@ export function loadConfig(env = process.env) {
     allowedOrigins,
     allowUnauthenticatedWrites: truthy.has((env.ALLOW_UNAUTHENTICATED_WRITES ?? 'false').toLowerCase()),
     demoMode: truthy.has((env.DEMO_MODE ?? 'false').toLowerCase()),
+    databaseUrl: env.DATABASE_URL ?? '',
     underwritingProvider: env.UNDERWRITING_PROVIDER ?? 'deterministic',
     ai: {
       apiUrl: env.AI_API_URL,

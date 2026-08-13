@@ -1,5 +1,6 @@
 import { parseAssessmentRequest, parseChainEventRequest, parseDemoInvoiceRequest, parseReceivableRequest, ValidationError } from './validation.js';
 import { isDomainError } from './service.js';
+import { authAddress, WalletAuth } from './auth.js';
 
 const MAX_BODY_BYTES = 64 * 1024;
 const WINDOW_MS = 15 * 60 * 1000;
@@ -8,6 +9,7 @@ const MAX_WRITES_PER_WINDOW = 25;
 
 export function createApp({ config, service, chainReader }) {
   const limits = new Map();
+  const walletAuth = new WalletAuth();
 
   return async function app(request, response) {
     const requestId = crypto.randomUUID();
@@ -19,7 +21,14 @@ export function createApp({ config, service, chainReader }) {
     try {
       const url = new URL(request.url, 'http://localhost');
       if (request.method === 'GET' && url.pathname === '/health') {
-        return send(response, 200, { status: 'ok', service: 'cessio-api', underwritingProvider: config.underwritingProvider, demoMode: config.demoMode, unauthenticatedWritesEnabled: config.allowUnauthenticatedWrites }, requestId);
+        return send(response, 200, { status: 'ok', service: 'cessio-api', underwritingProvider: config.underwritingProvider, storage: config.databaseUrl ? 'postgres' : 'file', demoMode: config.demoMode, unauthenticatedWritesEnabled: config.allowUnauthenticatedWrites }, requestId);
+      }
+      const nonceMatch = url.pathname.match(/^\/v1\/auth\/nonce\/(0x[a-fA-F0-9]{40})$/);
+      if (request.method === 'GET' && nonceMatch) return send(response, 200, { address: nonceMatch[1].toLowerCase(), nonce: walletAuth.issueNonce(nonceMatch[1]) }, requestId);
+      if (request.method === 'POST' && url.pathname === '/v1/auth/verify') {
+        const body = await readJson(request);
+        const session = walletAuth.verify(body.address, body.message, body.signature);
+        return send(response, 200, { ...session, authenticated: true }, requestId);
       }
       const chainReceiptMatch = url.pathname.match(/^\/v1\/chain\/receipts\/([1-9]\d*)$/);
       if (request.method === 'GET' && chainReceiptMatch) {
@@ -27,10 +36,17 @@ export function createApp({ config, service, chainReader }) {
         return send(response, 200, { receipt: await chainReader.getReceipt(Number(chainReceiptMatch[1])) }, requestId);
       }
 
-      if (isWrite(request.method) && !config.allowUnauthenticatedWrites) {
+      const authenticatedWallet = authAddress(request, walletAuth);
+      if (isWrite(request.method) && !config.allowUnauthenticatedWrites && !authenticatedWallet) {
         if (request.method === 'POST' && url.pathname === '/v1/demo/receivables' && config.demoMode) {
           const result = await service.createDemoReceivable(parseDemoInvoiceRequest(await readJson(request)));
           return send(response, 201, result, requestId);
+        }
+        const demoEventMatch = url.pathname.match(/^\/v1\/receivables\/(rcv_[a-f0-9-]+)\/chain-events$/);
+        if (request.method === 'POST' && demoEventMatch && config.demoMode) {
+          const event = await service.addChainEvent(demoEventMatch[1], parseChainEventRequest(await readJson(request)));
+          if (isDomainError(event)) return send(response, event.error.statusCode, { error: { code: 'CHAIN_EVENT_REJECTED', message: event.error.message } }, requestId);
+          return send(response, 201, { event }, requestId);
         }
         return send(response, 503, { error: { code: 'AUTH_REQUIRED', message: 'Write operations are disabled until wallet authentication is configured' } }, requestId);
       }
@@ -42,11 +58,15 @@ export function createApp({ config, service, chainReader }) {
       }
 
       if (request.method === 'POST' && url.pathname === '/v1/underwriting/assessments') {
-        const assessment = await service.createAssessment(parseAssessmentRequest(await readJson(request)));
+        const assessmentInput = parseAssessmentRequest(await readJson(request));
+        if (authenticatedWallet && authenticatedWallet !== assessmentInput.originatorWallet) return send(response, 403, { error: { code: 'WALLET_MISMATCH', message: 'Wallet session does not match originatorWallet' } }, requestId);
+        const assessment = await service.createAssessment(assessmentInput);
         return send(response, 201, { assessment }, requestId);
       }
       if (request.method === 'POST' && url.pathname === '/v1/receivables') {
-        const receivable = await service.createReceivable(parseReceivableRequest(await readJson(request)));
+        const receivableInput = parseReceivableRequest(await readJson(request));
+        if (authenticatedWallet && authenticatedWallet !== receivableInput.originatorWallet) return send(response, 403, { error: { code: 'WALLET_MISMATCH', message: 'Wallet session does not match originatorWallet' } }, requestId);
+        const receivable = await service.createReceivable(receivableInput);
         if (isDomainError(receivable)) return send(response, receivable.error.statusCode, { error: { code: 'RECEIVABLE_CONFLICT', message: receivable.error.message } }, requestId);
         return send(response, 201, { receivable }, requestId);
       }

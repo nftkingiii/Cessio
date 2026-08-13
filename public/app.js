@@ -333,6 +333,16 @@ async function waitForReceipt(hash) {
   throw new Error('Transaction confirmation timed out');
 }
 
+async function recordChainEvent(receivableId, type, txHash) {
+  if (!receivableId || !txHash) return;
+  const response = await fetch(`/v1/receivables/${receivableId}/chain-events`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ type, txHash, chainId: 968, contractAddress: CONTRACTS.receivables })
+  });
+  if (!response.ok) drawerFootnote.textContent = 'Transaction succeeded, but Cessio could not save its evidence record.';
+}
+
 async function submitFunding() {
   if (!state.account) return connectWallet();
   if (!state.receipt || state.receipt.status !== 1) return;
@@ -356,6 +366,7 @@ async function submitFunding() {
       params: [{ from: state.account, to: CONTRACTS.receivables, data: `0xe91c4052${encodeWord(state.receipt.id)}${encodeWord(amount)}` }]
     });
     await waitForReceipt(fundHash);
+    await recordChainEvent(latestDemo?.receivable?.id, 'funded', fundHash);
     drawerFootnote.textContent = `Funding confirmed: ${fundHash.slice(0, 10)}...${fundHash.slice(-8)}`;
     activity.unshift({ receiptId: state.receipt.id.toString(), label: `Receipt #${state.receipt.id} funded`, hash: `${fundHash.slice(0, 10)}...${fundHash.slice(-8)}`, amount: (Number(amount) / 1_000_000).toLocaleString(undefined, { maximumFractionDigits: 6 }) });
     localStorage.setItem('cessio-funding-activity', JSON.stringify(activity.slice(0, 12)));
@@ -415,6 +426,7 @@ async function registerDemo() {
     const assessmentDigest = await sha256Hex(JSON.stringify(latestDemo.assessment.decision));
     const hash = await requestWallet('register receivable', 'eth_sendTransaction', [{ from: state.account, to: CONTRACTS.receivables, data: encodeCreateReceivable({ originator: state.account, token: CONTRACTS.token, principal: amount, repayment, deadline, invoiceDigest, assessmentDigest }) }]);
     await waitForReceipt(hash);
+    await recordChainEvent(latestDemo.receivable.id, 'receivable_registered', hash);
     state.receipt = await readReceipt(latestDemoReceiptId);
     state.receiptId = latestDemoReceiptId;
     state.receiptError = null;

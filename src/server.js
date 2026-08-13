@@ -4,14 +4,16 @@ import { fileURLToPath } from 'node:url';
 import { createApp } from './app.js';
 import { createTestnetReceiptReader } from './chain.js';
 import { loadConfig } from './config.js';
-import { FileRepository } from './repository.js';
+import { FileRepository, PostgresRepository } from './repository.js';
 import { CessioService } from './service.js';
 import { createStaticHandler } from './static.js';
 import { createUnderwriter } from './underwriting.js';
 
 const config = loadConfig();
 const projectRoot = join(fileURLToPath(new URL('..', import.meta.url)));
-const repository = new FileRepository(join(projectRoot, 'data', 'cessio.json'));
+const repository = config.databaseUrl
+  ? new PostgresRepository(config.databaseUrl)
+  : new FileRepository(join(projectRoot, 'data', 'cessio.json'));
 const service = new CessioService({ repository, underwriter: createUnderwriter(config) });
 const app = createApp({ config, service, chainReader: createTestnetReceiptReader() });
 const serveStatic = createStaticHandler(join(projectRoot, 'public'));

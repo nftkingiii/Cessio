@@ -14,7 +14,7 @@ Public X account: https://x.com/cessioapp
 - Verified Testnet contracts and explorer-linked settlement proof.
 - Railway deployment configuration with a `/health` endpoint.
 
-The current release is Testnet Live. Mainnet deployment, wallet-signature authentication, managed persistence, and open receivable creation remain roadmap work.
+The current release is Testnet Live. Railway uses PostgreSQL when `DATABASE_URL` is configured and falls back to the local file repository for development. Demo-mode Testnet creation remains intentionally bounded; general write endpoints require a verified wallet signature session.
 
 ## BOT Chain Testnet
 
@@ -54,6 +54,16 @@ Copy-Item .env.example .env
 npm start
 ```
 
+### Railway persistence
+
+1. In Railway, add a PostgreSQL service to the project.
+2. In the Cessio service variables, add `DATABASE_URL` using the PostgreSQL service's connection reference.
+3. Keep `ALLOW_UNAUTHENTICATED_WRITES=false`.
+4. Keep `DEMO_MODE=true` only while the public Testnet demo is needed.
+5. Redeploy and confirm `/health` reports `status: ok`, then create one demo record and verify it remains after a restart.
+
+Without `DATABASE_URL`, the app uses `data/cessio.json`, which is not durable across Railway redeploys.
+
 Open http://localhost:3001 after the server starts.
 
 ## API
@@ -66,6 +76,8 @@ Open http://localhost:3001 after the server starts.
 | `GET` | `/v1/receivables` | List receivables without sensitive evidence data |
 | `GET` | `/v1/receivables/:id` | Read one receivable and its audit trail |
 | `POST` | `/v1/receivables/:id/chain-events` | Attach a Testnet/Mainnet transaction reference |
+| `GET` | `/v1/auth/nonce/:address` | Issue a short-lived wallet-signature nonce |
+| `POST` | `/v1/auth/verify` | Verify a wallet signature and return a short-lived session token |
 
 ## Development commands
 
