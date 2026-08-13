@@ -13,7 +13,7 @@ const CONTRACTS = Object.freeze({
 });
 
 const RECEIVABLE_STATUS = ['Unissued', 'Funding', 'Funded', 'Repaid', 'Cancelled'];
-const state = { account: null, receipt: null, receiptError: null, tokenBalance: null, pending: false };
+const state = { account: null, receipt: null, receiptId: 1n, receiptError: null, tokenBalance: null, pending: false };
 
 const walletButton = document.querySelector('#connect-wallet');
 const networkStatusText = document.querySelector('#network-status-text');
@@ -57,6 +57,8 @@ const opportunitiesBody = document.querySelector('#opportunities-body');
 let latestDemo = null;
 let latestDemoReceiptId = null;
 let activity = JSON.parse(localStorage.getItem('cessio-funding-activity') || '[]');
+const storedReceiptId = activity[0]?.receiptId || activity[0]?.label?.match(/Receipt #(\d+)/)?.[1];
+if (storedReceiptId) state.receiptId = BigInt(storedReceiptId);
 
 function renderIcons() {
   if (window.lucide) window.lucide.createIcons({ attrs: { 'stroke-width': 1.6 } });
@@ -100,7 +102,7 @@ function encodeCreateReceivable({ originator, token, principal, repayment, deadl
   return `0xbbd61590${encodeAddress(originator)}${encodeAddress(originator)}${encodeAddress(token)}${encodeWord(principal)}${encodeWord(repayment)}${encodeWord(deadline)}${encodeBytes32(invoiceDigest)}${encodeBytes32(assessmentDigest)}`;
 }
 
-async function readReceipt(receiptId = CONTRACTS.receiptId) {
+async function readReceipt(receiptId = state.receiptId) {
   const response = await fetch(`/v1/chain/receipts/${receiptId}`, { headers: { Accept: 'application/json' } });
   const payload = await response.json();
   if (!response.ok || !payload.receipt) throw new Error(payload.error?.message || 'Testnet receipt read failed');
@@ -160,7 +162,7 @@ function renderFundingState() {
 async function refreshContractState() {
   syncChainButton.setAttribute('aria-busy', 'true');
   try {
-    state.receipt = await readReceipt();
+    state.receipt = await readReceipt(state.receiptId);
     state.receiptError = null;
   } catch (error) {
     state.receipt = null;
@@ -355,7 +357,7 @@ async function submitFunding() {
     });
     await waitForReceipt(fundHash);
     drawerFootnote.textContent = `Funding confirmed: ${fundHash.slice(0, 10)}...${fundHash.slice(-8)}`;
-    activity.unshift({ label: `Receipt #${state.receipt.id} funded`, hash: `${fundHash.slice(0, 10)}...${fundHash.slice(-8)}`, amount: (Number(amount) / 1_000_000).toLocaleString(undefined, { maximumFractionDigits: 6 }) });
+    activity.unshift({ receiptId: state.receipt.id.toString(), label: `Receipt #${state.receipt.id} funded`, hash: `${fundHash.slice(0, 10)}...${fundHash.slice(-8)}`, amount: (Number(amount) / 1_000_000).toLocaleString(undefined, { maximumFractionDigits: 6 }) });
     localStorage.setItem('cessio-funding-activity', JSON.stringify(activity.slice(0, 12)));
     renderPortfolio();
     await refreshContractState();
@@ -414,6 +416,7 @@ async function registerDemo() {
     const hash = await requestWallet('register receivable', 'eth_sendTransaction', [{ from: state.account, to: CONTRACTS.receivables, data: encodeCreateReceivable({ originator: state.account, token: CONTRACTS.token, principal: amount, repayment, deadline, invoiceDigest, assessmentDigest }) }]);
     await waitForReceipt(hash);
     state.receipt = await readReceipt(latestDemoReceiptId);
+    state.receiptId = latestDemoReceiptId;
     state.receiptError = null;
     renderReceipt();
     demoResultCopy.textContent = `Registered on BOT Testnet: ${hash.slice(0, 12)}...${hash.slice(-8)}. You can now approve cUSDT and fund this receipt from the connected wallet.`;
@@ -428,6 +431,7 @@ async function registerDemo() {
 async function fundDemo() {
   if (!latestDemo || latestDemoReceiptId === null) return;
   state.receipt = await readReceipt(latestDemoReceiptId);
+  state.receiptId = latestDemoReceiptId;
   state.receiptError = null;
   renderReceipt();
   fundAmount.value = '';
