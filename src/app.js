@@ -71,13 +71,15 @@ export function createApp({ config, service, chainReader }) {
         return send(response, 201, { receivable }, requestId);
       }
       if (request.method === 'GET' && url.pathname === '/v1/receivables') {
-        return send(response, 200, { receivables: await service.listReceivables() }, requestId);
+        const receivables = await service.listReceivables();
+        return send(response, 200, { receivables: await addChainState(receivables, chainReader) }, requestId);
       }
       const receivableMatch = url.pathname.match(/^\/v1\/receivables\/(rcv_[a-f0-9-]+)$/);
       if (request.method === 'GET' && receivableMatch) {
         const receivable = await service.getReceivable(receivableMatch[1]);
         if (isDomainError(receivable)) return send(response, receivable.error.statusCode, { error: { code: 'NOT_FOUND', message: receivable.error.message } }, requestId);
-        return send(response, 200, { receivable }, requestId);
+        const [enriched] = await addChainState([receivable], chainReader);
+        return send(response, 200, { receivable: enriched }, requestId);
       }
       const eventMatch = url.pathname.match(/^\/v1\/receivables\/(rcv_[a-f0-9-]+)\/chain-events$/);
       if (request.method === 'POST' && eventMatch) {
@@ -94,6 +96,20 @@ export function createApp({ config, service, chainReader }) {
       return send(response, 500, { error: { code: 'INTERNAL_ERROR', message: 'Unexpected server error' } }, requestId);
     }
   };
+}
+
+async function addChainState(receivables, chainReader) {
+  if (!chainReader) return receivables;
+  return Promise.all(receivables.map(async (receivable) => {
+    const registration = [...(receivable.chainEvents || [])].reverse().find((event) => event.type === 'receivable_registered' && event.chainReceiptId);
+    if (!registration) return receivable;
+    try {
+      const chainState = await chainReader.getReceipt(registration.chainReceiptId);
+      return { ...receivable, chainState: { ...chainState, registrationTxHash: registration.txHash } };
+    } catch {
+      return receivable;
+    }
+  }));
 }
 
 async function readJson(request) {

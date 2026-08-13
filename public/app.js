@@ -189,7 +189,7 @@ function renderPortfolio() {
 }
 
 function seedOpportunityRows() {
-  return `<tr><td><strong>Atlas Compute</strong><span>Compute provider</span></td><td>GPU capacity invoice</td><td>$1,000</td><td><span class="risk-pill low">Low · 18</span></td><td>20d</td><td><div class="mini-progress"><span style="width:64%"></span></div><span class="mono">64%</span></td><td><button class="icon-button open-fund" data-receivable="Atlas Compute" aria-label="Fund Atlas Compute"><i data-lucide="arrow-up-right"></i></button></td></tr>`;
+  return `<tr><td><strong>Atlas Compute</strong><span>Compute provider</span></td><td>GPU capacity invoice</td><td>$1,000</td><td><span class="risk-pill low">Low · 18</span></td><td>20d</td><td><span class="mono">Illustrative</span></td><td><button class="icon-button open-fund" data-receivable="Atlas Compute" aria-label="Fund Atlas Compute"><i data-lucide="arrow-up-right"></i></button></td></tr>`;
 }
 
 function renderOpportunityRows(receivables = []) {
@@ -200,7 +200,10 @@ function renderOpportunityRows(receivables = []) {
     const amount = Number(entry.requestedFundingAmount || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
     const risk = Number(decision.riskScore ?? 0);
     const riskClass = risk <= 30 ? 'low' : 'review';
-    return `<tr><td><strong>${label}</strong><span>${invoice.serviceCategory || 'Receivable'}</span></td><td>${invoice.invoiceReference || 'Demo invoice'}</td><td>$${amount}</td><td><span class="risk-pill ${riskClass}">${riskClass === 'low' ? 'Low' : 'Review'} · ${risk}</span></td><td>${invoice.dueDate || '--'}</td><td><span class="mono">TESTNET</span></td><td><button class="icon-button open-fund" data-receivable="${label}" aria-label="Fund ${label}"><i data-lucide="arrow-up-right"></i></button></td></tr>`;
+    const chainState = entry.chainState;
+    const fundingPercent = chainState ? Math.min(100, Math.round((Number(chainState.totalFunded) / Number(chainState.principal)) * 100)) : null;
+    const fundingCell = fundingPercent === null ? '<span class="mono">Awaiting registration</span>' : `<div class="mini-progress"><span style="width:${fundingPercent}%"></span></div><span class="mono">${fundingPercent}%</span>`;
+    return `<tr><td><strong>${label}</strong><span>${invoice.serviceCategory || 'Receivable'}</span></td><td>${invoice.invoiceReference || 'Demo invoice'}</td><td>$${amount}</td><td><span class="risk-pill ${riskClass}">${riskClass === 'low' ? 'Low' : 'Review'} · ${risk}</span></td><td>${invoice.dueDate || '--'}</td><td>${fundingCell}</td><td><button class="icon-button open-fund" data-receivable="${label}" aria-label="Fund ${label}"><i data-lucide="arrow-up-right"></i></button></td></tr>`;
   });
   opportunitiesBody.innerHTML = rows.length ? rows.join('') : seedOpportunityRows();
   document.querySelectorAll('#opportunities-body .open-fund').forEach((button) => button.addEventListener('click', openFundDrawer));

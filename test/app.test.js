@@ -51,7 +51,7 @@ test('returns a normalized Testnet receipt through the same-origin API', async (
 });
 
 test('runs the testnet development underwriting flow when explicitly enabled', async () => {
-  await withServer({ ...baseConfig, allowUnauthenticatedWrites: true }, async (baseUrl) => {
+  await withServer({ ...baseConfig, allowUnauthenticatedWrites: true, demoMode: true }, async (baseUrl) => {
     const response = await fetch(`${baseUrl}/v1/underwriting/assessments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -110,4 +110,25 @@ test('allows the production Cessio origin for browser writes', async () => {
     assert.equal(response.status, 204);
     assert.equal(response.headers.get('access-control-allow-origin'), 'https://cessio.up.railway.app');
   });
+});
+
+test('enriches persisted receivables with live chain funding state', async () => {
+  await withServer({ ...baseConfig, allowUnauthenticatedWrites: true, demoMode: true }, async (baseUrl) => {
+    const create = await fetch(`${baseUrl}/v1/demo/receivables`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        originatorWallet: '0x1111111111111111111111111111111111111111', obligorName: 'Chain Compute', invoiceReference: 'CHAIN-1', invoiceAmount: '1000', currency: 'USD', issuedDate: '2026-08-10', dueDate: '2026-08-30', serviceCategory: 'GPU compute', evidenceDigest: 'c'.repeat(64), deliveryConfidence: 0.96
+      })
+    });
+    const payload = await create.json();
+    const event = await fetch(`${baseUrl}/v1/receivables/${payload.receivable.id}/chain-events`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'receivable_registered', txHash: `0x${'d'.repeat(64)}`, chainId: 968, contractAddress: '0x2222222222222222222222222222222222222222', chainReceiptId: 5 })
+    });
+    assert.equal(event.status, 201);
+    const list = await fetch(`${baseUrl}/v1/receivables`);
+    const listed = (await list.json()).receivables[0];
+    assert.equal(listed.chainState.totalFunded, '5000000');
+    assert.equal(listed.chainState.principal, '795000000');
+  }, { getReceipt: async () => ({ id: 5, principal: '795000000', repayment: '834750000', status: 1, totalFunded: '5000000' }) });
 });
