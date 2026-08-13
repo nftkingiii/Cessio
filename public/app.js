@@ -555,10 +555,11 @@ async function waitForReceipt(hash) {
 
 async function recordChainEvent(receivableId, type, txHash, chainReceiptId = null) {
   if (!receivableId || !txHash) return;
+  const serializedReceiptId = chainReceiptId === null || chainReceiptId === undefined ? null : Number(chainReceiptId);
   const response = await fetch(`/v1/receivables/${receivableId}/chain-events`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...authHeaders() },
-    body: JSON.stringify({ type, txHash, chainId: 968, contractAddress: CONTRACTS.receivables, chainReceiptId })
+    body: JSON.stringify({ type, txHash, chainId: 968, contractAddress: CONTRACTS.receivables, chainReceiptId: serializedReceiptId })
   });
   if (!response.ok) drawerFootnote.textContent = 'Transaction succeeded, but Cessio could not save its evidence record.';
 }
