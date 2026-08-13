@@ -65,7 +65,13 @@ const swapQuoteButton = document.querySelector('#swap-quote');
 const swapQuoteStatus = document.querySelector('#swap-quote-status');
 const openSwapButton = document.querySelector('#open-swap');
 const closeSwapButton = document.querySelector('.close-swap');
+const swapInputToken = document.querySelector('#swap-in');
+const swapOutputToken = document.querySelector('#swap-out');
+const swapDirectionButton = document.querySelector('#swap-direction');
 let swapQuote = null;
+let swapDirection = 'BOT_USDT';
+let swapQuoteTimer = null;
+let swapQuoteRequest = 0;
 let latestDemo = null;
 let latestDemoReceiptId = null;
 let activity = JSON.parse(localStorage.getItem('cessio-funding-activity') || '[]');
@@ -273,11 +279,42 @@ function openSwapDrawer() {
   swapDrawer.classList.add('open');
   swapDrawer.setAttribute('aria-hidden', 'false');
   swapAmount.focus();
+  syncSwapWallet();
 }
 
 function closeSwapDrawer() {
   swapDrawer.classList.remove('open');
   swapDrawer.setAttribute('aria-hidden', 'true');
+}
+
+function swapTokens() {
+  swapDirection = swapDirection === 'BOT_USDT' ? 'USDT_BOT' : 'BOT_USDT';
+  const botToUsdt = swapDirection === 'BOT_USDT';
+  swapInputToken.textContent = botToUsdt ? 'BOT' : 'USDT';
+  swapOutputToken.textContent = botToUsdt ? 'USDT' : 'BOT';
+  swapInputToken.classList.add('active');
+  swapOutputToken.classList.remove('active');
+  document.querySelector('#swap-in-symbol').textContent = botToUsdt ? 'BOT' : 'USDT';
+  swapAmount.step = botToUsdt ? 'any' : '0.000001';
+  swapQuote = null;
+  swapQuoteButton.querySelector('span').textContent = 'Get quote';
+  swapQuoteStatus.textContent = state.account ? 'Enter an amount to request a route.' : 'Connect a wallet on BOT Chain to request a route.';
+  scheduleSwapQuote();
+}
+
+async function syncSwapWallet() {
+  if (!window.ethereum) return false;
+  try {
+    const [account] = await requestWallet('read connected account', 'eth_accounts');
+    if (account && account.toLowerCase() !== state.account?.toLowerCase()) setConnectedAccount(account);
+    if (!account) {
+      swapQuoteStatus.textContent = 'Connect a wallet on BOT Chain to request a route.';
+      return false;
+    }
+    return true;
+  } catch {
+    return Boolean(state.account);
+  }
 }
 
 function decodeAmountsOut(data) {
@@ -290,32 +327,77 @@ function decodeAmountsOut(data) {
 }
 
 async function getSwapQuote() {
-  if (!state.account) return connectWallet();
+  if (!state.account && !(await syncSwapWallet())) {
+    await connectWallet();
+    if (!state.account) return;
+  }
+  const requestId = ++swapQuoteRequest;
   try {
     await ensureTestnet();
     const normalized = swapAmount.value.trim();
-    if (!/^\d+(\.\d{1,18})?$/.test(normalized) || Number(normalized) <= 0) throw new Error('Enter a BOT amount with up to 18 decimals');
+    const decimals = swapDirection === 'BOT_USDT' ? 18 : 6;
+    const inputSymbol = swapDirection === 'BOT_USDT' ? 'BOT' : 'USDT';
+    if (!new RegExp(`^\\d+(\\.\\d{1,${decimals}})?$`).test(normalized) || Number(normalized) <= 0) throw new Error(`Enter a ${inputSymbol} amount with up to ${decimals} decimals`);
     const [whole, fraction = ''] = normalized.split('.');
-    const amount = BigInt(whole) * 1_000_000_000_000_000_000n + BigInt(fraction.padEnd(18, '0'));
+    const unit = 10n ** BigInt(decimals);
+    const amount = BigInt(whole) * unit + BigInt(fraction.padEnd(decimals, '0'));
     const chain = BDEX.testnet;
-    const data = `0xd06ca61f${encodeWord(amount)}${encodeDynamicAddressPath([chain.wbot, chain.usdt], 64)}`;
+    const path = swapDirection === 'BOT_USDT' ? [chain.wbot, chain.usdt] : [chain.usdt, chain.wbot];
+    const data = `0xd06ca61f${encodeWord(amount)}${encodeDynamicAddressPath(path, 64)}`;
     const result = await requestWallet('read BDEX quote', 'eth_call', [{ to: chain.router, data }, 'latest']);
     const output = decodeAmountsOut(result);
-    swapQuote = { amount, output, chain };
-    swapQuoteStatus.textContent = `Estimated output: ${(Number(output) / 1_000_000).toLocaleString(undefined, { maximumFractionDigits: 6 })} USDT. Confirm to swap in your wallet.`;
-    swapQuoteButton.querySelector('span').textContent = 'Swap BOT for USDT';
+    if (requestId !== swapQuoteRequest) return;
+    const outputDecimals = swapDirection === 'BOT_USDT' ? 6 : 18;
+    const outputSymbol = swapDirection === 'BOT_USDT' ? 'USDT' : 'BOT';
+    swapQuote = { amount, output, chain, path };
+    swapQuoteStatus.textContent = `Estimated output: ${formatTokenAmount(output, outputDecimals)} ${outputSymbol}. Confirm to swap in your wallet.`;
+    swapQuoteButton.querySelector('span').textContent = `Swap ${inputSymbol} for ${outputSymbol}`;
   } catch (error) {
+    if (requestId !== swapQuoteRequest) return;
     swapQuote = null;
     swapQuoteStatus.textContent = error.message || 'No BDEX route is available for this amount.';
   }
 }
 
+function formatTokenAmount(amount, decimals) {
+  const unit = 10n ** BigInt(decimals);
+  const whole = amount / unit;
+  const fraction = (amount % unit).toString().padStart(decimals, '0').replace(/0+$/, '');
+  return `${whole.toLocaleString()}${fraction ? `.${fraction}` : ''}`;
+}
+
+function scheduleSwapQuote() {
+  window.clearTimeout(swapQuoteTimer);
+  swapQuoteRequest += 1;
+  swapQuote = null;
+  swapQuoteButton.querySelector('span').textContent = 'Get quote';
+  if (!swapAmount.value.trim()) {
+    swapQuoteStatus.textContent = state.account ? 'Enter an amount to request a route.' : 'Connect a wallet on BOT Chain to request a route.';
+    return;
+  }
+  swapQuoteStatus.textContent = 'Updating quote...';
+  swapQuoteTimer = window.setTimeout(() => getSwapQuote(), 350);
+}
+
 async function executeSwap() {
   if (!swapQuote) return getSwapQuote();
   try {
+    if (!state.account && !(await syncSwapWallet())) return connectWallet();
     const deadline = Math.floor(Date.now() / 1000) + 900;
-    const data = `0x7ff36ab5${encodeWord((swapQuote.output * 995n) / 1000n)}${encodeWord(128)}${encodeAddress(state.account)}${encodeWord(deadline)}${encodeDynamicAddressPath([swapQuote.chain.wbot, swapQuote.chain.usdt], 128)}`;
-    const hash = await requestWallet('swap BOT for USDT', 'eth_sendTransaction', [{ from: state.account, to: swapQuote.chain.router, value: `0x${swapQuote.amount.toString(16)}`, data }]);
+    const minimumOutput = (swapQuote.output * 995n) / 1000n;
+    let hash;
+    if (swapDirection === 'BOT_USDT') {
+      const data = `0x7ff36ab5${encodeWord(minimumOutput)}${encodeWord(128)}${encodeAddress(state.account)}${encodeWord(deadline)}${encodeDynamicAddressPath(swapQuote.path, 128)}`;
+      await requestWallet('check BOT swap', 'eth_estimateGas', [{ from: state.account, to: swapQuote.chain.router, value: `0x${swapQuote.amount.toString(16)}`, data }]);
+      hash = await requestWallet('swap BOT for USDT', 'eth_sendTransaction', [{ from: state.account, to: swapQuote.chain.router, value: `0x${swapQuote.amount.toString(16)}`, data }]);
+    } else {
+      const approvalData = `0x095ea7b3${encodeAddress(swapQuote.chain.router)}${encodeWord(swapQuote.amount)}`;
+      const approvalHash = await requestWallet('approve USDT for BDEX', 'eth_sendTransaction', [{ from: state.account, to: swapQuote.chain.usdt, data: approvalData }]);
+      await waitForReceipt(approvalHash);
+      const data = `0x18cbafe5${encodeWord(swapQuote.amount)}${encodeWord(minimumOutput)}${encodeWord(160)}${encodeAddress(state.account)}${encodeWord(deadline)}${encodeDynamicAddressPath(swapQuote.path, 160)}`;
+      await requestWallet('check USDT swap', 'eth_estimateGas', [{ from: state.account, to: swapQuote.chain.router, data }]);
+      hash = await requestWallet('swap USDT for BOT', 'eth_sendTransaction', [{ from: state.account, to: swapQuote.chain.router, data }]);
+    }
     await waitForReceipt(hash);
     swapQuoteStatus.textContent = `Swap confirmed: ${hash.slice(0, 12)}...${hash.slice(-8)}`;
     swapQuote = null;
@@ -606,6 +688,8 @@ function watchWallet() {
 document.querySelectorAll('.open-fund').forEach((button) => button.addEventListener('click', openFundDrawer));
 openSwapButton.addEventListener('click', openSwapDrawer);
 closeSwapButton.addEventListener('click', closeSwapDrawer);
+swapDirectionButton.addEventListener('click', swapTokens);
+swapAmount.addEventListener('input', scheduleSwapQuote);
 swapQuoteButton.addEventListener('click', executeSwap);
 document.querySelectorAll('[data-view]').forEach((link) => link.addEventListener('click', (event) => { event.preventDefault(); setView(link.dataset.view); }));
 closeDrawer.addEventListener('click', closeFundDrawer);
