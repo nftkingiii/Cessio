@@ -549,7 +549,7 @@ async function fundDemo() {
 }
 
 function setView(view) {
-  const next = ['market', 'opportunities', 'portfolio', 'create'].includes(view) ? view : 'market';
+  const next = ['market', 'opportunities', 'funding', 'portfolio', 'create'].includes(view) ? view : 'market';
   document.querySelectorAll('[data-view-panel]').forEach((panel) => { panel.hidden = panel.dataset.viewPanel !== next || (panel.id === 'demo-results' && !latestDemo); });
   document.querySelectorAll('[data-view]').forEach((link) => link.classList.toggle('active', link.dataset.view === next));
   if (window.location.hash !== `#${next}`) history.replaceState(null, '', `#${next}`);
