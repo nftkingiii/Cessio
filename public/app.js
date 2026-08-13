@@ -96,8 +96,8 @@ function encodeAddress(address) {
   return address.slice(2).toLowerCase().padStart(64, '0');
 }
 
-function encodeDynamicAddressPath(addresses) {
-  return `${encodeWord(64)}${encodeWord(addresses.length)}${addresses.map((address) => encodeAddress(address)).join('')}`;
+function encodeDynamicAddressPath(addresses, offsetBytes) {
+  return `${encodeWord(offsetBytes)}${encodeWord(addresses.length)}${addresses.map((address) => encodeAddress(address)).join('')}`;
 }
 
 function hexFromBytes(bytes) {
@@ -297,7 +297,7 @@ async function getSwapQuote() {
     const [whole, fraction = ''] = normalized.split('.');
     const amount = BigInt(whole) * 1_000_000_000_000_000_000n + BigInt(fraction.padEnd(18, '0'));
     const chain = BDEX.testnet;
-    const data = `0xd06ca61f${encodeWord(amount)}${encodeDynamicAddressPath([chain.wbot, chain.usdt])}`;
+    const data = `0xd06ca61f${encodeWord(amount)}${encodeDynamicAddressPath([chain.wbot, chain.usdt], 64)}`;
     const result = await requestWallet('read BDEX quote', 'eth_call', [{ to: chain.router, data }, 'latest']);
     const output = decodeAmountsOut(result);
     swapQuote = { amount, output, chain };
@@ -313,7 +313,7 @@ async function executeSwap() {
   if (!swapQuote) return getSwapQuote();
   try {
     const deadline = Math.floor(Date.now() / 1000) + 900;
-    const data = `0x7ff36ab5${encodeWord((swapQuote.output * 995n) / 1000n)}${encodeWord(128)}${encodeAddress(state.account)}${encodeWord(deadline)}${encodeDynamicAddressPath([swapQuote.chain.wbot, swapQuote.chain.usdt])}`;
+    const data = `0x7ff36ab5${encodeWord((swapQuote.output * 995n) / 1000n)}${encodeWord(128)}${encodeAddress(state.account)}${encodeWord(deadline)}${encodeDynamicAddressPath([swapQuote.chain.wbot, swapQuote.chain.usdt], 128)}`;
     const hash = await requestWallet('swap BOT for USDT', 'eth_sendTransaction', [{ from: state.account, to: swapQuote.chain.router, value: `0x${swapQuote.amount.toString(16)}`, data }]);
     await waitForReceipt(hash);
     swapQuoteStatus.textContent = `Swap confirmed: ${hash.slice(0, 12)}...${hash.slice(-8)}`;
