@@ -22,3 +22,13 @@ test('creates an approved receivable and omits its evidence digest from read res
   assert.equal(readBack.invoice.evidenceDigest, undefined);
   assert.equal(readBack.auditEvents.length, 1);
 });
+
+test('lists only receivables that have been registered on-chain', async () => {
+  const repository = new MemoryRepository();
+  const service = new CessioService({ repository, underwriter: new DeterministicUnderwriter(), clock: () => new Date('2026-08-10T00:00:00Z') });
+  const assessment = await service.createAssessment(invoice);
+  const receivable = await service.createReceivable({ assessmentId: assessment.id, originatorWallet: invoice.originatorWallet, settlementToken: '0x2222222222222222222222222222222222222222', chainId: 968, requestedFundingAmount: '500.00' });
+  assert.equal((await service.listReceivables()).length, 0);
+  await service.addChainEvent(receivable.id, { type: 'receivable_registered', txHash: `0x${'e'.repeat(64)}`, chainId: 968, contractAddress: '0x2222222222222222222222222222222222222222', chainReceiptId: 1 });
+  assert.equal((await service.listReceivables()).length, 1);
+});

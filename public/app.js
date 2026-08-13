@@ -77,7 +77,7 @@ let swapQuoteTimer = null;
 let swapQuoteRequest = 0;
 let swapToastTimer = null;
 let swapQuoteKey = null;
-let latestDemo = null;
+let latestDemo = JSON.parse(localStorage.getItem('cessio-latest-demo') || 'null');
 let latestDemoReceiptId = null;
 let activity = JSON.parse(localStorage.getItem('cessio-funding-activity') || '[]');
 const storedReceiptId = activity[0]?.receiptId || activity[0]?.label?.match(/Receipt #(\d+)/)?.[1];
@@ -220,7 +220,7 @@ function renderPortfolio() {
 }
 
 function seedOpportunityRows() {
-  return `<tr><td><strong>Atlas Compute</strong><span>Compute provider</span></td><td>GPU capacity invoice</td><td>$1,000</td><td><span class="risk-pill low">Low · 18</span></td><td>20d</td><td><span class="mono">Illustrative</span></td><td><button class="icon-button open-fund" data-receivable="Atlas Compute" aria-label="Fund Atlas Compute"><i data-lucide="arrow-up-right"></i></button></td></tr>`;
+  return '<tr><td colspan="7"><span class="portfolio-empty">No registered opportunities are available yet.</span></td></tr>';
 }
 
 function renderOpportunityRows(receivables = []) {
@@ -239,6 +239,23 @@ function renderOpportunityRows(receivables = []) {
   opportunitiesBody.innerHTML = rows.length ? rows.join('') : seedOpportunityRows();
   document.querySelectorAll('#opportunities-body .open-fund').forEach((button) => button.addEventListener('click', openFundDrawer));
   renderIcons();
+}
+
+function renderLatestDemo() {
+  if (!latestDemo?.receivable) {
+    demoResults.hidden = true;
+    return;
+  }
+  demoResults.hidden = false;
+  const decision = latestDemo.assessment?.decision || {};
+  const registered = latestDemoReceiptId !== null || latestDemo.receivable.chainEvents?.some((event) => event.type === 'receivable_registered');
+  demoResultTitle.textContent = registered ? 'Registered on BOT Testnet' : decision.decision === 'approved' ? 'Approved for Testnet registration' : 'Held for review';
+  demoResultCopy.textContent = registered
+    ? 'This receivable is registered and available in Opportunities for funding.'
+    : `Risk ${decision.riskScore}/100. Maximum funding: ${decision.maxFundingAmount} USD. Register it from the connected underwriter wallet to create the on-chain receipt.`;
+  registerDemoButton.disabled = registered || !latestDemo.receivable;
+  fundDemoButton.disabled = !registered;
+  if (latestDemoReceiptId !== null) fundDemoButton.dataset.receiptId = latestDemoReceiptId.toString();
 }
 
 async function refreshOpportunities() {
@@ -605,8 +622,9 @@ async function submitDemo(event) {
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error?.message || 'Demo submission failed');
     latestDemo = payload;
+    localStorage.setItem('cessio-latest-demo', JSON.stringify(latestDemo));
     await refreshOpportunities();
-    demoResults.hidden = false;
+    renderLatestDemo();
     demoResultTitle.textContent = payload.assessment.decision.decision === 'approved' ? 'Approved for Testnet registration' : 'Held for review';
     demoResultCopy.textContent = payload.receivable ? `Risk ${payload.assessment.decision.riskScore}/100. Maximum funding: ${payload.assessment.decision.maxFundingAmount} ${invoice.currency}. Register it from the connected underwriter wallet to create the on-chain receipt.` : payload.assessment.decision.reasons.join(' ');
     registerDemoButton.disabled = !payload.receivable;
@@ -634,6 +652,8 @@ async function registerDemo() {
     const hash = await requestWallet('register receivable', 'eth_sendTransaction', [{ from: state.account, to: CONTRACTS.receivables, data: encodeCreateReceivable({ originator: state.account, token: CONTRACTS.token, principal: amount, repayment, deadline, invoiceDigest, assessmentDigest }) }]);
     await waitForReceipt(hash);
     await recordChainEvent(latestDemo.receivable.id, 'receivable_registered', hash, latestDemoReceiptId);
+    latestDemo.receivable.chainEvents = [...(latestDemo.receivable.chainEvents || []), { type: 'receivable_registered', txHash: hash, chainReceiptId: Number(latestDemoReceiptId) }];
+    localStorage.setItem('cessio-latest-demo', JSON.stringify(latestDemo));
     state.receipt = await readReceipt(latestDemoReceiptId);
     state.receiptId = latestDemoReceiptId;
     state.receiptError = null;
@@ -641,6 +661,7 @@ async function registerDemo() {
     demoResultCopy.textContent = `Registered on BOT Testnet: ${hash.slice(0, 12)}...${hash.slice(-8)}. You can now approve cUSDT and fund this receipt from the connected wallet.`;
     fundDemoButton.disabled = false;
     fundDemoButton.dataset.receiptId = latestDemoReceiptId.toString();
+    renderLatestDemo();
   } catch (error) {
     demoResultCopy.textContent = error.message || 'Registration failed';
     registerDemoButton.disabled = false;
@@ -741,6 +762,7 @@ window.addEventListener('load', () => {
   demoForm.querySelector('[name="dueDate"]').value = due.toISOString().slice(0, 10);
   renderIcons();
   renderOpportunityRows([]);
+  renderLatestDemo();
   setView(window.location.hash.slice(1) || 'market');
   renderPortfolio();
   refreshMarket();
