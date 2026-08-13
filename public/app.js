@@ -68,10 +68,14 @@ const closeSwapButton = document.querySelector('.close-swap');
 const swapInputToken = document.querySelector('#swap-in');
 const swapOutputToken = document.querySelector('#swap-out');
 const swapDirectionButton = document.querySelector('#swap-direction');
+const swapToast = document.querySelector('#swap-toast');
+const swapToastLink = document.querySelector('#swap-toast-link');
+const swapToastClose = document.querySelector('#swap-toast-close');
 let swapQuote = null;
 let swapDirection = 'BOT_USDT';
 let swapQuoteTimer = null;
 let swapQuoteRequest = 0;
+let swapToastTimer = null;
 let swapQuoteKey = null;
 let latestDemo = null;
 let latestDemoReceiptId = null;
@@ -292,6 +296,19 @@ function closeSwapDrawer() {
   swapDrawer.setAttribute('aria-hidden', 'true');
 }
 
+function showSwapToast(hash) {
+  window.clearTimeout(swapToastTimer);
+  swapToastLink.href = `https://scan.bohr.life/tx/${hash}`;
+  swapToast.hidden = false;
+  renderIcons();
+  swapToastTimer = window.setTimeout(() => { swapToast.hidden = true; }, 7000);
+}
+
+function hideSwapToast() {
+  window.clearTimeout(swapToastTimer);
+  swapToast.hidden = true;
+}
+
 function swapTokens() {
   swapDirection = swapDirection === 'BOT_USDT' ? 'USDT_BOT' : 'BOT_USDT';
   const botToUsdt = swapDirection === 'BOT_USDT';
@@ -409,6 +426,7 @@ async function executeSwap() {
     }
     await waitForReceipt(hash);
     swapQuoteStatus.textContent = `Swap confirmed: ${hash.slice(0, 12)}...${hash.slice(-8)}`;
+    showSwapToast(hash);
     swapQuote = null;
     swapQuoteButton.querySelector('span').textContent = 'Get quote';
     await refreshWalletBalance();
@@ -700,6 +718,7 @@ closeSwapButton.addEventListener('click', closeSwapDrawer);
 swapDirectionButton.addEventListener('click', swapTokens);
 swapAmount.addEventListener('input', scheduleSwapQuote);
 swapQuoteButton.addEventListener('click', executeSwap);
+swapToastClose.addEventListener('click', hideSwapToast);
 document.querySelectorAll('[data-view]').forEach((link) => link.addEventListener('click', (event) => { event.preventDefault(); setView(link.dataset.view); }));
 closeDrawer.addEventListener('click', closeFundDrawer);
 backdrop.addEventListener('click', closeFundDrawer);

@@ -176,6 +176,11 @@
       <p class="drawer-footnote" id="drawer-footnote"><i data-lucide="shield-check"></i> Funding requires an explicit wallet approval, then a separate fund confirmation.</p>
     </aside>
     <div class="drawer-backdrop" id="drawer-backdrop" hidden></div>
+    <div class="toast" id="swap-toast" role="status" aria-live="polite" hidden>
+      <i data-lucide="circle-check"></i>
+      <div><strong>Swap confirmed</strong><a id="swap-toast-link" href="#" target="_blank" rel="noreferrer">View transaction</a></div>
+      <button class="toast-close" id="swap-toast-close" type="button" aria-label="Dismiss notification"><i data-lucide="x"></i></button>
+    </div>
     <aside class="swap-drawer" id="swap-drawer" aria-labelledby="swap-title" aria-hidden="true">
       <button class="icon-button close-swap" aria-label="Close swap panel"><i data-lucide="x"></i></button>
       <p class="eyebrow">BDEX route <span>BOT</span></p><h2 id="swap-title">Swap into funding USDT.</h2>
