@@ -6,6 +6,11 @@ const TESTNET = Object.freeze({
   blockExplorerUrls: ['https://scan.bohr.life']
 });
 
+const BDEX = Object.freeze({
+  testnet: { router: '0xD6425a02f0845B8D99e349C34D2E7A576E177345', wbot: '0xD5452816194a3784dBa983426cCe7c122F4abd30', usdt: '0x75edC9335175Fc0552D51D48439F229c10420fe3' },
+  mainnet: { router: '0x1414eD29FdFD322c3c0a830330ed982E2D629e76', wbot: '0xD5452816194a3784dBa983426cCe7c122F4abd30', usdt: '0xaBabc7Ddc03e501d190C676BF3d92ef0e6e87a3C' }
+});
+
 const CONTRACTS = Object.freeze({
   token: '0x4D0984B958b4376dE072DC098404c4afA9155C90',
   receivables: '0x212d99C7fC7C83901e8d6BB0F82d937F9735d248',
@@ -54,6 +59,13 @@ const portfolioRepayment = document.querySelector('#portfolio-repayment');
 const portfolioConnect = document.querySelector('#portfolio-connect');
 const portfolioActivity = document.querySelector('#portfolio-activity');
 const opportunitiesBody = document.querySelector('#opportunities-body');
+const swapDrawer = document.querySelector('#swap-drawer');
+const swapAmount = document.querySelector('#swap-amount');
+const swapQuoteButton = document.querySelector('#swap-quote');
+const swapQuoteStatus = document.querySelector('#swap-quote-status');
+const openSwapButton = document.querySelector('#open-swap');
+const closeSwapButton = document.querySelector('.close-swap');
+let swapQuote = null;
 let latestDemo = null;
 let latestDemoReceiptId = null;
 let activity = JSON.parse(localStorage.getItem('cessio-funding-activity') || '[]');
@@ -82,6 +94,10 @@ function encodeWord(value) {
 function encodeAddress(address) {
   if (!/^0x[a-fA-F0-9]{40}$/.test(address)) throw new Error('Invalid contract address');
   return address.slice(2).toLowerCase().padStart(64, '0');
+}
+
+function encodeDynamicAddressPath(addresses) {
+  return `${encodeWord(64)}${encodeWord(addresses.length)}${addresses.map((address) => encodeAddress(address)).join('')}`;
 }
 
 function hexFromBytes(bytes) {
@@ -251,6 +267,62 @@ function closeFundDrawer() {
   drawer.classList.remove('open');
   drawer.setAttribute('aria-hidden', 'true');
   backdrop.hidden = true;
+}
+
+function openSwapDrawer() {
+  swapDrawer.classList.add('open');
+  swapDrawer.setAttribute('aria-hidden', 'false');
+  swapAmount.focus();
+}
+
+function closeSwapDrawer() {
+  swapDrawer.classList.remove('open');
+  swapDrawer.setAttribute('aria-hidden', 'true');
+}
+
+function decodeAmountsOut(data) {
+  if (typeof data !== 'string' || data.length < 194) throw new Error('BDEX returned an invalid quote');
+  const offset = Number(BigInt(`0x${data.slice(2, 66)}`));
+  const length = Number(BigInt(`0x${data.slice(2 + offset * 2, 66 + offset * 2)}`));
+  if (length < 2) throw new Error('BDEX returned no swap route');
+  return BigInt(`0x${data.slice(2 + (offset + 1) * 64, 2 + (offset + 2) * 64)}`);
+}
+
+async function getSwapQuote() {
+  if (!state.account) return connectWallet();
+  try {
+    await ensureTestnet();
+    const normalized = swapAmount.value.trim();
+    if (!/^\d+(\.\d{1,18})?$/.test(normalized) || Number(normalized) <= 0) throw new Error('Enter a BOT amount with up to 18 decimals');
+    const [whole, fraction = ''] = normalized.split('.');
+    const amount = BigInt(whole) * 1_000_000_000_000_000_000n + BigInt(fraction.padEnd(18, '0'));
+    const chain = BDEX.testnet;
+    const data = `0xd06ca61f${encodeWord(amount)}${encodeDynamicAddressPath([chain.wbot, chain.usdt])}`;
+    const result = await requestWallet('read BDEX quote', 'eth_call', [{ to: chain.router, data }, 'latest']);
+    const output = decodeAmountsOut(result);
+    swapQuote = { amount, output, chain };
+    swapQuoteStatus.textContent = `Estimated output: ${(Number(output) / 1_000_000).toLocaleString(undefined, { maximumFractionDigits: 6 })} USDT. Confirm to swap in your wallet.`;
+    swapQuoteButton.querySelector('span').textContent = 'Swap BOT for USDT';
+  } catch (error) {
+    swapQuote = null;
+    swapQuoteStatus.textContent = error.message || 'No BDEX route is available for this amount.';
+  }
+}
+
+async function executeSwap() {
+  if (!swapQuote) return getSwapQuote();
+  try {
+    const deadline = Math.floor(Date.now() / 1000) + 900;
+    const data = `0x7ff36ab5${encodeWord((swapQuote.output * 995n) / 1000n)}${encodeWord(128)}${encodeAddress(state.account)}${encodeWord(deadline)}${encodeDynamicAddressPath([swapQuote.chain.wbot, swapQuote.chain.usdt])}`;
+    const hash = await requestWallet('swap BOT for USDT', 'eth_sendTransaction', [{ from: state.account, to: swapQuote.chain.router, value: `0x${swapQuote.amount.toString(16)}`, data }]);
+    await waitForReceipt(hash);
+    swapQuoteStatus.textContent = `Swap confirmed: ${hash.slice(0, 12)}...${hash.slice(-8)}`;
+    swapQuote = null;
+    swapQuoteButton.querySelector('span').textContent = 'Get quote';
+    await refreshWalletBalance();
+  } catch (error) {
+    swapQuoteStatus.textContent = error.message || 'Swap failed';
+  }
 }
 
 async function ensureTestnet() {
@@ -531,6 +603,9 @@ function watchWallet() {
 }
 
 document.querySelectorAll('.open-fund').forEach((button) => button.addEventListener('click', openFundDrawer));
+openSwapButton.addEventListener('click', openSwapDrawer);
+closeSwapButton.addEventListener('click', closeSwapDrawer);
+swapQuoteButton.addEventListener('click', executeSwap);
 document.querySelectorAll('[data-view]').forEach((link) => link.addEventListener('click', (event) => { event.preventDefault(); setView(link.dataset.view); }));
 closeDrawer.addEventListener('click', closeFundDrawer);
 backdrop.addEventListener('click', closeFundDrawer);

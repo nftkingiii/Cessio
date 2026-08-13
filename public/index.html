@@ -153,6 +153,14 @@
           </div>
           <p class="portfolio-note"><i data-lucide="info"></i> Testnet demo activity is for product inspection only and is not production volume or user traction.</p>
         </section>
+
+        <section class="funding-rails" id="funding-rails" aria-labelledby="funding-rails-title" data-view-panel="market">
+          <div class="view-heading"><p class="eyebrow">Funding rails <span>BOT</span></p><h2 id="funding-rails-title">Bring capital to the market.</h2><p>Swap into BOT Chain USDT through BDEX, or use the official bridge to move USDT from a supported network. Cessio never takes custody of these funds.</p></div>
+          <div class="rails-grid">
+            <article class="rail-panel"><div class="panel-heading"><div><p class="eyebrow">Swap</p><h3>BDEX</h3></div><i data-lucide="arrow-up-right"></i></div><p>Convert supported BOT Chain assets into settlement USDT before funding a receivable.</p><button class="button button-primary" id="open-swap"><span>Open swap rail</span><i data-lucide="arrow-right"></i></button><p class="rail-status" id="swap-status">Quote route loads after wallet connection.</p></article>
+            <article class="rail-panel"><div class="panel-heading"><div><p class="eyebrow">Bridge</p><h3>USDT in / out</h3></div><i data-lucide="arrow-up-right"></i></div><p>Move USDT between a supported external network and BOT Chain using the official bridge interface.</p><a class="button button-quiet" href="https://bridge.botchain.ai" target="_blank" rel="noreferrer"><span>Open official bridge</span><i data-lucide="external-link"></i></a><p class="rail-status">Bridge transfers are user-signed and non-custodial.</p></article>
+          </div>
+        </section>
       </main>
     </div>
 
@@ -167,5 +175,12 @@
       <p class="drawer-footnote" id="drawer-footnote"><i data-lucide="shield-check"></i> Funding requires an explicit wallet approval, then a separate fund confirmation.</p>
     </aside>
     <div class="drawer-backdrop" id="drawer-backdrop" hidden></div>
+    <aside class="swap-drawer" id="swap-drawer" aria-labelledby="swap-title" aria-hidden="true">
+      <button class="icon-button close-swap" aria-label="Close swap panel"><i data-lucide="x"></i></button>
+      <p class="eyebrow">BDEX route <span>BOT</span></p><h2 id="swap-title">Swap into funding USDT.</h2>
+      <label for="swap-amount">Amount</label><div class="amount-input"><input id="swap-amount" type="number" min="0" step="any" placeholder="0.00" /><span id="swap-in-symbol">BOT</span></div>
+      <div class="swap-pair"><button class="token-chip active" id="swap-in">BOT</button><i data-lucide="arrow-down"></i><button class="token-chip" id="swap-out">USDT</button></div>
+      <button class="button button-primary" id="swap-quote"><span>Get quote</span><i data-lucide="arrow-right"></i></button><p class="rail-status" id="swap-quote-status">Connect a wallet on BOT Chain to request a route.</p>
+    </aside>
   </body>
 </html>
