@@ -72,6 +72,7 @@ let swapQuote = null;
 let swapDirection = 'BOT_USDT';
 let swapQuoteTimer = null;
 let swapQuoteRequest = 0;
+let swapQuoteKey = null;
 let latestDemo = null;
 let latestDemoReceiptId = null;
 let activity = JSON.parse(localStorage.getItem('cessio-funding-activity') || '[]');
@@ -102,8 +103,12 @@ function encodeAddress(address) {
   return address.slice(2).toLowerCase().padStart(64, '0');
 }
 
+function encodeDynamicAddressArray(addresses) {
+  return `${encodeWord(addresses.length)}${addresses.map((address) => encodeAddress(address)).join('')}`;
+}
+
 function encodeDynamicAddressPath(addresses, offsetBytes) {
-  return `${encodeWord(offsetBytes)}${encodeWord(addresses.length)}${addresses.map((address) => encodeAddress(address)).join('')}`;
+  return `${encodeWord(offsetBytes)}${encodeDynamicAddressArray(addresses)}`;
 }
 
 function hexFromBytes(bytes) {
@@ -297,6 +302,7 @@ function swapTokens() {
   document.querySelector('#swap-in-symbol').textContent = botToUsdt ? 'BOT' : 'USDT';
   swapAmount.step = botToUsdt ? 'any' : '0.000001';
   swapQuote = null;
+  swapQuoteKey = null;
   swapQuoteButton.querySelector('span').textContent = 'Get quote';
   swapQuoteStatus.textContent = state.account ? 'Enter an amount to request a route.' : 'Connect a wallet on BOT Chain to request a route.';
   scheduleSwapQuote();
@@ -349,7 +355,8 @@ async function getSwapQuote() {
     if (requestId !== swapQuoteRequest) return;
     const outputDecimals = swapDirection === 'BOT_USDT' ? 6 : 18;
     const outputSymbol = swapDirection === 'BOT_USDT' ? 'USDT' : 'BOT';
-    swapQuote = { amount, output, chain, path };
+    swapQuote = { amount, output, chain, path, direction: swapDirection, input: normalized };
+    swapQuoteKey = `${swapDirection}:${normalized}`;
     swapQuoteStatus.textContent = `Estimated output: ${formatTokenAmount(output, outputDecimals)} ${outputSymbol}. Confirm to swap in your wallet.`;
     swapQuoteButton.querySelector('span').textContent = `Swap ${inputSymbol} for ${outputSymbol}`;
   } catch (error) {
@@ -370,6 +377,7 @@ function scheduleSwapQuote() {
   window.clearTimeout(swapQuoteTimer);
   swapQuoteRequest += 1;
   swapQuote = null;
+  swapQuoteKey = null;
   swapQuoteButton.querySelector('span').textContent = 'Get quote';
   if (!swapAmount.value.trim()) {
     swapQuoteStatus.textContent = state.account ? 'Enter an amount to request a route.' : 'Connect a wallet on BOT Chain to request a route.';
@@ -380,21 +388,22 @@ function scheduleSwapQuote() {
 }
 
 async function executeSwap() {
-  if (!swapQuote) return getSwapQuote();
+  const currentKey = `${swapDirection}:${swapAmount.value.trim()}`;
+  if (!swapQuote || swapQuoteKey !== currentKey || swapQuote.direction !== swapDirection) return getSwapQuote();
   try {
     if (!state.account && !(await syncSwapWallet())) return connectWallet();
     const deadline = Math.floor(Date.now() / 1000) + 900;
     const minimumOutput = (swapQuote.output * 995n) / 1000n;
     let hash;
     if (swapDirection === 'BOT_USDT') {
-      const data = `0x7ff36ab5${encodeWord(minimumOutput)}${encodeWord(128)}${encodeAddress(state.account)}${encodeWord(deadline)}${encodeDynamicAddressPath(swapQuote.path, 128)}`;
+      const data = `0x7ff36ab5${encodeWord(minimumOutput)}${encodeWord(128)}${encodeAddress(state.account)}${encodeWord(deadline)}${encodeDynamicAddressArray(swapQuote.path)}`;
       await requestWallet('check BOT swap', 'eth_estimateGas', [{ from: state.account, to: swapQuote.chain.router, value: `0x${swapQuote.amount.toString(16)}`, data }]);
       hash = await requestWallet('swap BOT for USDT', 'eth_sendTransaction', [{ from: state.account, to: swapQuote.chain.router, value: `0x${swapQuote.amount.toString(16)}`, data }]);
     } else {
       const approvalData = `0x095ea7b3${encodeAddress(swapQuote.chain.router)}${encodeWord(swapQuote.amount)}`;
       const approvalHash = await requestWallet('approve USDT for BDEX', 'eth_sendTransaction', [{ from: state.account, to: swapQuote.chain.usdt, data: approvalData }]);
       await waitForReceipt(approvalHash);
-      const data = `0x18cbafe5${encodeWord(swapQuote.amount)}${encodeWord(minimumOutput)}${encodeWord(160)}${encodeAddress(state.account)}${encodeWord(deadline)}${encodeDynamicAddressPath(swapQuote.path, 160)}`;
+      const data = `0x18cbafe5${encodeWord(swapQuote.amount)}${encodeWord(minimumOutput)}${encodeWord(160)}${encodeAddress(state.account)}${encodeWord(deadline)}${encodeDynamicAddressArray(swapQuote.path)}`;
       await requestWallet('check USDT swap', 'eth_estimateGas', [{ from: state.account, to: swapQuote.chain.router, data }]);
       hash = await requestWallet('swap USDT for BOT', 'eth_sendTransaction', [{ from: state.account, to: swapQuote.chain.router, data }]);
     }
