@@ -285,7 +285,8 @@ function decodeAmountsOut(data) {
   const offset = Number(BigInt(`0x${data.slice(2, 66)}`));
   const length = Number(BigInt(`0x${data.slice(2 + offset * 2, 66 + offset * 2)}`));
   if (length < 2) throw new Error('BDEX returned no swap route');
-  return BigInt(`0x${data.slice(2 + (offset + 1) * 64, 2 + (offset + 2) * 64)}`);
+  const finalAmountStart = 2 + (offset + 32 * length) * 2;
+  return BigInt(`0x${data.slice(finalAmountStart, finalAmountStart + 64)}`);
 }
 
 async function getSwapQuote() {
