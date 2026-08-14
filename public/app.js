@@ -59,6 +59,11 @@ const portfolioRepayment = document.querySelector('#portfolio-repayment');
 const portfolioConnect = document.querySelector('#portfolio-connect');
 const portfolioActivity = document.querySelector('#portfolio-activity');
 const opportunitiesBody = document.querySelector('#opportunities-body');
+const metricOpenCapacity = document.querySelector('#metric-open-capacity');
+const metricOpenCapacityNote = document.querySelector('#metric-open-capacity-note');
+const metricReceiptCount = document.querySelector('#metric-receipt-count');
+const metricReceiptCountNote = document.querySelector('#metric-receipt-count-note');
+const metricMedianTerm = document.querySelector('#metric-median-term');
 const swapDrawer = document.querySelector('#swap-drawer');
 const swapAmount = document.querySelector('#swap-amount');
 const swapQuoteButton = document.querySelector('#swap-quote');
@@ -241,6 +246,28 @@ function renderOpportunityRows(receivables = []) {
   renderIcons();
 }
 
+function renderMarketMetrics(receivables = []) {
+  const readableReceipts = receivables.filter((entry) => entry.chainState?.principal !== undefined && entry.chainState?.totalFunded !== undefined);
+  const openCapacity = readableReceipts.reduce((total, entry) => {
+    const principal = BigInt(entry.chainState.principal);
+    const funded = BigInt(entry.chainState.totalFunded);
+    return total + (principal > funded ? principal - funded : 0n);
+  }, 0n);
+  const terms = receivables.map((entry) => {
+    const issued = Date.parse(entry.invoice?.issuedDate || '');
+    const due = Date.parse(entry.invoice?.dueDate || '');
+    return Number.isFinite(issued) && Number.isFinite(due) && due >= issued ? Math.round((due - issued) / 86_400_000) : null;
+  }).filter((term) => term !== null).sort((a, b) => a - b);
+  const middle = Math.floor(terms.length / 2);
+  const medianTerm = terms.length ? (terms.length % 2 ? terms[middle] : Math.round((terms[middle - 1] + terms[middle]) / 2)) : null;
+
+  metricOpenCapacity.textContent = formatCUSDT(openCapacity);
+  metricOpenCapacityNote.textContent = readableReceipts.length ? 'Across readable registered receipts' : 'No readable registered receipts';
+  metricReceiptCount.textContent = String(receivables.length);
+  metricReceiptCountNote.textContent = 'Registered on BOT Testnet';
+  metricMedianTerm.textContent = medianTerm === null ? '--' : `${medianTerm}d`;
+}
+
 function renderLatestDemo() {
   if (!latestDemo?.receivable) {
     demoResults.hidden = true;
@@ -262,9 +289,14 @@ async function refreshOpportunities() {
   try {
     const response = await fetch('/v1/receivables', { headers: { Accept: 'application/json' } });
     const payload = await response.json();
-    if (response.ok) renderOpportunityRows(payload.receivables || []);
+    if (response.ok) {
+      const receivables = payload.receivables || [];
+      renderOpportunityRows(receivables);
+      renderMarketMetrics(receivables);
+    }
   } catch {
     renderOpportunityRows([]);
+    renderMarketMetrics([]);
   }
 }
 
@@ -763,6 +795,7 @@ window.addEventListener('load', () => {
   demoForm.querySelector('[name="dueDate"]').value = due.toISOString().slice(0, 10);
   renderIcons();
   renderOpportunityRows([]);
+  renderMarketMetrics([]);
   renderLatestDemo();
   setView(window.location.hash.slice(1) || 'market');
   renderPortfolio();
