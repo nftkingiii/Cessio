@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto';
 
 export class CessioService {
-  constructor({ repository, underwriter, clock = () => new Date() }) {
+  constructor({ repository, underwriter, network = { chainId: 968, settlementTokenAddress: '0x4D0984B958b4376dE072DC098404c4afA9155C90' }, clock = () => new Date() }) {
     this.repository = repository;
     this.underwriter = underwriter;
+    this.network = network;
     this.clock = clock;
   }
 
@@ -32,8 +33,8 @@ export class CessioService {
     const receivable = await this.createReceivable({
       assessmentId: assessment.id,
       originatorWallet: invoice.originatorWallet,
-      settlementToken: '0x4D0984B958b4376dE072DC098404c4afA9155C90',
-      chainId: 968,
+      settlementToken: this.network.settlementTokenAddress,
+      chainId: this.network.chainId,
       requestedFundingAmount
     });
     return { assessment, receivable };

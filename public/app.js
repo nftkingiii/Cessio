@@ -1,21 +1,19 @@
-const TESTNET = Object.freeze({
-  chainId: '0x3c8',
+const FALLBACK_NETWORK = Object.freeze({
+  key: 'testnet',
+  chainId: 968,
+  chainIdHex: '0x3c8',
   chainName: 'BOT Chain Testnet',
   nativeCurrency: { name: 'BOT', symbol: 'BOT', decimals: 18 },
-  rpcUrls: ['https://rpc.bohr.life'],
-  blockExplorerUrls: ['https://scan.bohr.life']
+  rpcUrl: 'https://rpc.bohr.life',
+  explorerUrl: 'https://scan.bohr.life',
+  receivablesAddress: '0x212d99C7fC7C83901e8d6BB0F82d937F9735d248',
+  settlementTokenAddress: '0x4D0984B958b4376dE072DC098404c4afA9155C90',
+  settlementTokenSymbol: 'cUSDT',
+  bdex: { router: '0xD6425a02f0845B8D99e349C34D2E7A576E177345', wbot: '0xD5452816194a3784dBa983426cCe7c122F4abd30', usdt: '0x75edC9335175Fc0552D51D48439F229c10420fe3' }
 });
 
-const BDEX = Object.freeze({
-  testnet: { router: '0xD6425a02f0845B8D99e349C34D2E7A576E177345', wbot: '0xD5452816194a3784dBa983426cCe7c122F4abd30', usdt: '0x75edC9335175Fc0552D51D48439F229c10420fe3' },
-  mainnet: { router: '0x1414eD29FdFD322c3c0a830330ed982E2D629e76', wbot: '0xD5452816194a3784dBa983426cCe7c122F4abd30', usdt: '0xaBabc7Ddc03e501d190C676BF3d92ef0e6e87a3C' }
-});
-
-const CONTRACTS = Object.freeze({
-  token: '0x4D0984B958b4376dE072DC098404c4afA9155C90',
-  receivables: '0x212d99C7fC7C83901e8d6BB0F82d937F9735d248',
-  receiptId: 1n
-});
+let network = FALLBACK_NETWORK;
+let contracts = Object.freeze({ token: network.settlementTokenAddress, receivables: network.receivablesAddress });
 
 const RECEIVABLE_STATUS = ['Unissued', 'Funding', 'Funded', 'Repaid', 'Cancelled'];
 const state = { account: null, authToken: null, receipt: null, receiptId: 1n, receiptError: null, tokenBalance: null, pending: false };
@@ -64,6 +62,15 @@ const metricOpenCapacityNote = document.querySelector('#metric-open-capacity-not
 const metricReceiptCount = document.querySelector('#metric-receipt-count');
 const metricReceiptCountNote = document.querySelector('#metric-receipt-count-note');
 const metricMedianTerm = document.querySelector('#metric-median-term');
+const proofChainId = document.querySelector('#proof-chain-id');
+const proofTitle = document.querySelector('#proof-title');
+const proofCopy = document.querySelector('#proof-copy');
+const receivablesContractLink = document.querySelector('#receivables-contract-link');
+const settlementTokenLink = document.querySelector('#settlement-token-link');
+const claimTransactionLink = document.querySelector('#claim-transaction-link');
+const claimTransactionCopy = document.querySelector('#claim-transaction-copy');
+const portfolioTokenLabel = document.querySelector('#portfolio-token-label');
+const portfolioTokenNote = document.querySelector('#portfolio-token-note');
 const swapDrawer = document.querySelector('#swap-drawer');
 const swapAmount = document.querySelector('#swap-amount');
 const swapQuoteButton = document.querySelector('#swap-quote');
@@ -92,6 +99,36 @@ function renderIcons() {
   if (window.lucide) window.lucide.createIcons({ attrs: { 'stroke-width': 1.6 } });
 }
 
+async function loadNetwork() {
+  try {
+    const response = await fetch('/v1/network', { headers: { Accept: 'application/json' } });
+    const payload = await response.json();
+    if (!response.ok || !payload.network) throw new Error('Network configuration is unavailable');
+    network = Object.freeze(payload.network);
+    contracts = Object.freeze({ token: network.settlementTokenAddress, receivables: network.receivablesAddress });
+  } catch {
+    network = FALLBACK_NETWORK;
+    contracts = Object.freeze({ token: network.settlementTokenAddress, receivables: network.receivablesAddress });
+  }
+
+  networkStatusText.textContent = network.chainName;
+  proofChainId.textContent = String(network.chainId);
+  proofTitle.textContent = `${network.key === 'mainnet' ? 'Mainnet' : 'Testnet'} receipt, readable on-chain.`;
+  proofCopy.textContent = network.key === 'mainnet'
+    ? 'Mainnet receipt evidence appears here after the first Cessio lifecycle completes on the deployed contracts.'
+    : 'Receipt #1 was created, funded, repaid, and claimed through the deployed Cessio contracts.';
+  receivablesContractLink.href = `${network.explorerUrl}/address/${contracts.receivables}`;
+  settlementTokenLink.href = `${network.explorerUrl}/address/${contracts.token}`;
+  settlementTokenLink.firstChild.textContent = `Verified ${network.settlementTokenSymbol} settlement token `;
+  portfolioTokenLabel.textContent = `${network.settlementTokenSymbol} balance`;
+  portfolioTokenNote.textContent = `${network.chainName} settlement token`;
+  metricReceiptCountNote.textContent = `Registered on ${network.chainName}`;
+  if (network.key === 'mainnet') {
+    claimTransactionLink.href = `${network.explorerUrl}/address/${contracts.receivables}`;
+    claimTransactionCopy.textContent = 'Open receivables contract';
+  }
+}
+
 function setButton(button, text, disabled) {
   button.disabled = disabled;
   if (button === fundButton) fundButtonText.textContent = text;
@@ -100,7 +137,7 @@ function setButton(button, text, disabled) {
 function formatCUSDT(amount) {
   const whole = amount / 1_000_000n;
   const fraction = (amount % 1_000_000n).toString().padStart(6, '0').replace(/0+$/, '');
-  return `${whole.toLocaleString()}${fraction ? `.${fraction}` : ''} cUSDT`;
+  return `${whole.toLocaleString()}${fraction ? `.${fraction}` : ''} ${network.settlementTokenSymbol}`;
 }
 
 function encodeWord(value) {
@@ -141,7 +178,7 @@ function encodeCreateReceivable({ originator, token, principal, repayment, deadl
 async function readReceipt(receiptId = state.receiptId) {
   const response = await fetch(`/v1/chain/receipts/${receiptId}`, { headers: { Accept: 'application/json' } });
   const payload = await response.json();
-  if (!response.ok || !payload.receipt) throw new Error(payload.error?.message || 'Testnet receipt read failed');
+  if (!response.ok || !payload.receipt) throw new Error(payload.error?.message || `${network.chainName} receipt read failed`);
   return {
     ...payload.receipt,
     id: BigInt(payload.receipt.id),
@@ -172,7 +209,7 @@ function renderReceipt() {
   receiptRepayment.textContent = formatCUSDT(state.receipt.repayment);
   receiptClaim.textContent = settled ? 'Completed' : 'Pending';
   portfolioReceipt.textContent = `Receipt #${state.receipt.id}`;
-  portfolioReceiptState.textContent = `${status} on BOT Testnet`;
+  portfolioReceiptState.textContent = `${status} on ${network.chainName}`;
   portfolioFunded.textContent = formatCUSDT(state.receipt.totalFunded);
   portfolioRepayment.textContent = formatCUSDT(state.receipt.repayment);
   renderFundingState();
@@ -181,7 +218,7 @@ function renderReceipt() {
 function renderFundingState() {
   const canFund = state.receipt && state.receipt.status === 1 && state.receipt.totalFunded < state.receipt.principal;
   if (!state.account) {
-    drawerCopy.textContent = 'Connect a wallet to inspect the deployed Testnet receipt. Funding is enabled only while a receipt is open.';
+    drawerCopy.textContent = `Connect a wallet to inspect the deployed ${network.chainName} receipt. Funding is enabled only while a receipt is open.`;
     setButton(fundButton, 'Connect wallet to continue', false);
     return;
   }
@@ -190,7 +227,7 @@ function renderFundingState() {
     setButton(fundButton, 'Receipt settled', true);
     return;
   }
-  drawerCopy.textContent = 'This Testnet receipt is open. Your wallet will approve cUSDT first, then submit a separate funding transaction.';
+  drawerCopy.textContent = `This ${network.chainName} receipt is open. Your wallet will approve ${network.settlementTokenSymbol} first, then submit a separate funding transaction.`;
   if (state.tokenBalance !== null) drawerFootnote.textContent = `Available balance: ${formatCUSDT(state.tokenBalance)}. Funding checks this balance before approval.`;
   setButton(fundButton, state.pending ? 'Wallet confirmation in progress' : 'Approve and fund', state.pending);
 }
@@ -210,17 +247,17 @@ async function refreshContractState() {
 }
 
 async function readTokenBalance(account) {
-  const result = await requestWallet('read cUSDT balance', 'eth_call', [{ to: CONTRACTS.token, data: `0x70a08231${encodeAddress(account)}` }, 'latest']);
+  const result = await requestWallet(`read ${network.settlementTokenSymbol} balance`, 'eth_call', [{ to: contracts.token, data: `0x70a08231${encodeAddress(account)}` }, 'latest']);
   return BigInt(result);
 }
 
 function renderPortfolio() {
   portfolioAccount.textContent = state.account ? `${state.account.slice(0, 10)}...${state.account.slice(-8)}` : 'Not connected';
-  portfolioNetwork.textContent = state.account ? 'BOT Testnet connected' : 'Connect a wallet to continue';
+  portfolioNetwork.textContent = state.account ? `${network.chainName} connected` : 'Connect a wallet to continue';
   portfolioBalance.textContent = state.tokenBalance === null ? '--' : formatCUSDT(state.tokenBalance);
   portfolioConnect.hidden = Boolean(state.account);
   portfolioActivity.innerHTML = activity.length
-    ? activity.map((entry) => `<div class="activity-row"><span><strong>${entry.label}</strong><small>${entry.hash}</small></span><b>${entry.amount} cUSDT</b></div>`).join('')
+    ? activity.map((entry) => `<div class="activity-row"><span><strong>${entry.label}</strong><small>${entry.hash}</small></span><b>${entry.amount} ${network.settlementTokenSymbol}</b></div>`).join('')
     : '<span class="portfolio-empty">No funding activity recorded in this browser yet.</span>';
 }
 
@@ -264,7 +301,7 @@ function renderMarketMetrics(receivables = []) {
   metricOpenCapacity.textContent = formatCUSDT(openCapacity);
   metricOpenCapacityNote.textContent = readableReceipts.length ? 'Across readable registered receipts' : 'No readable registered receipts';
   metricReceiptCount.textContent = String(receivables.length);
-  metricReceiptCountNote.textContent = 'Registered on BOT Testnet';
+  metricReceiptCountNote.textContent = `Registered on ${network.chainName}`;
   metricMedianTerm.textContent = medianTerm === null ? '--' : `${medianTerm}d`;
 }
 
@@ -276,7 +313,7 @@ function renderLatestDemo() {
   demoResults.hidden = false;
   const decision = latestDemo.assessment?.decision || {};
   const registered = latestDemoReceiptId !== null || latestDemo.receivable.chainEvents?.some((event) => event.type === 'receivable_registered');
-  demoResultTitle.textContent = registered ? 'Registered on BOT Testnet' : decision.decision === 'approved' ? 'Approved for Testnet registration' : 'Held for review';
+  demoResultTitle.textContent = registered ? `Registered on ${network.chainName}` : decision.decision === 'approved' ? `Approved for ${network.key === 'mainnet' ? 'Mainnet' : 'Testnet'} registration` : 'Held for review';
   demoResultCopy.textContent = registered
     ? 'This receivable is registered and available in Opportunities for funding.'
     : `Risk ${decision.riskScore}/100. Maximum funding: ${decision.maxFundingAmount} USD. Register it from the connected underwriter wallet to create the on-chain receipt.`;
@@ -307,11 +344,11 @@ async function refreshWalletBalance() {
     return;
   }
   try {
-    await ensureTestnet();
+    await ensureNetwork();
     state.tokenBalance = await readTokenBalance(state.account);
   } catch (error) {
     state.tokenBalance = null;
-    drawerFootnote.textContent = error.message || 'Could not read cUSDT balance.';
+    drawerFootnote.textContent = error.message || `Could not read ${network.settlementTokenSymbol} balance.`;
   }
   renderPortfolio();
   renderFundingState();
@@ -347,7 +384,7 @@ function closeSwapDrawer() {
 
 function showSwapToast(hash) {
   window.clearTimeout(swapToastTimer);
-  swapToastLink.href = `https://scan.bohr.life/tx/${hash}`;
+  swapToastLink.href = `${network.explorerUrl}/tx/${hash}`;
   swapToast.hidden = false;
   renderIcons();
   swapToastTimer = window.setTimeout(() => { swapToast.hidden = true; }, 7000);
@@ -405,7 +442,7 @@ async function getSwapQuote() {
   }
   const requestId = ++swapQuoteRequest;
   try {
-    await ensureTestnet();
+    await ensureNetwork();
     const normalized = swapAmount.value.trim();
     const decimals = swapDirection === 'BOT_USDT' ? 18 : 6;
     const inputSymbol = swapDirection === 'BOT_USDT' ? 'BOT' : 'USDT';
@@ -413,7 +450,7 @@ async function getSwapQuote() {
     const [whole, fraction = ''] = normalized.split('.');
     const unit = 10n ** BigInt(decimals);
     const amount = BigInt(whole) * unit + BigInt(fraction.padEnd(decimals, '0'));
-    const chain = BDEX.testnet;
+    const chain = network.bdex;
     const path = swapDirection === 'BOT_USDT' ? [chain.wbot, chain.usdt] : [chain.usdt, chain.wbot];
     const data = `0xd06ca61f${encodeWord(amount)}${encodeDynamicAddressPath(path, 64)}`;
     const result = await requestWallet('read BDEX quote', 'eth_call', [{ to: chain.router, data }, 'latest']);
@@ -484,21 +521,21 @@ async function executeSwap() {
   }
 }
 
-async function ensureTestnet() {
+async function ensureNetwork() {
   const provider = window.ethereum;
   if (!provider) throw new Error('No EVM wallet was found');
   let chainId = await requestWallet('read network', 'eth_chainId');
-  if (chainId.toLowerCase() === TESTNET.chainId) return;
+  if (chainId.toLowerCase() === network.chainIdHex) return;
   try {
-    await requestWallet('switch network', 'wallet_switchEthereumChain', [{ chainId: TESTNET.chainId }]);
+    await requestWallet('switch network', 'wallet_switchEthereumChain', [{ chainId: network.chainIdHex }]);
   } catch (error) {
     const unknownChain = error.code === 4902 || /unrecognized chain id|unknown chain/i.test(error.message);
     if (!unknownChain) throw error;
-    await requestWallet('add BOT Testnet', 'wallet_addEthereumChain', [TESTNET]);
-    await requestWallet('switch to BOT Testnet', 'wallet_switchEthereumChain', [{ chainId: TESTNET.chainId }]);
+    await requestWallet(`add ${network.chainName}`, 'wallet_addEthereumChain', [{ chainId: network.chainIdHex, chainName: network.chainName, nativeCurrency: network.nativeCurrency, rpcUrls: [network.rpcUrl], blockExplorerUrls: [network.explorerUrl] }]);
+    await requestWallet(`switch to ${network.chainName}`, 'wallet_switchEthereumChain', [{ chainId: network.chainIdHex }]);
   }
   chainId = await requestWallet('confirm network', 'eth_chainId');
-  if (chainId.toLowerCase() !== TESTNET.chainId) throw new Error('BOT Testnet was not selected');
+  if (chainId.toLowerCase() !== network.chainIdHex) throw new Error(`${network.chainName} was not selected`);
 }
 
 async function requestWallet(stage, method, params) {
@@ -532,7 +569,7 @@ function setConnectedAccount(account) {
   state.account = account;
   state.authToken = null;
   walletButton.querySelector('span').textContent = `${account.slice(0, 6)}...${account.slice(-4)}`;
-  networkStatusText.textContent = 'BOT Testnet connected';
+  networkStatusText.textContent = `${network.chainName} connected`;
   authenticateWallet(account).then(() => renderPortfolio()).catch((error) => { drawerFootnote.textContent = error.message || 'Wallet sign-in failed'; });
   renderPortfolio();
   refreshWalletBalance();
@@ -546,7 +583,7 @@ async function connectWallet() {
   }
   try {
     const [account] = await requestWallet('request account access', 'eth_requestAccounts');
-    await ensureTestnet();
+    await ensureNetwork();
     setConnectedAccount(account);
   } catch (error) {
     const providerCode = Number.isInteger(error.code) ? ` (${error.code})` : '';
@@ -555,18 +592,18 @@ async function connectWallet() {
       ? 'Connection declined'
       : error.code === -32002
         ? 'Wallet request pending'
-        : error.message === 'BOT Testnet was not selected'
-          ? 'Switch to BOT Testnet'
+        : error.message === `${network.chainName} was not selected`
+          ? `Switch to ${network.chainName}`
           : `Wallet error${providerCode}`;
     walletButton.querySelector('span').textContent = message;
-    networkStatusText.textContent = message === 'Switch to BOT Testnet' ? 'Wrong network' : 'BOT Testnet';
+    networkStatusText.textContent = message.startsWith('Switch to ') ? 'Wrong network' : network.chainName;
     drawerFootnote.textContent = `Wallet provider: ${providerMessage}`;
   }
 }
 
 function parseCUSDT(value) {
   const normalized = value.trim();
-  if (!/^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/.test(normalized)) throw new Error('Enter a cUSDT amount with up to 6 decimals');
+  if (!/^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/.test(normalized)) throw new Error(`Enter a ${network.settlementTokenSymbol} amount with up to 6 decimals`);
   const [whole, fraction = ''] = normalized.split('.');
   const amount = BigInt(whole) * 1_000_000n + BigInt(fraction.padEnd(6, '0'));
   if (amount <= 0n) throw new Error('Funding amount must be greater than zero');
@@ -577,7 +614,7 @@ async function waitForReceipt(hash) {
   for (let attempt = 0; attempt < 30; attempt += 1) {
     const receipt = await window.ethereum.request({ method: 'eth_getTransactionReceipt', params: [hash] });
     if (receipt) {
-      if (receipt.status !== '0x1') throw new Error('Transaction reverted on BOT Testnet');
+      if (receipt.status !== '0x1') throw new Error(`Transaction reverted on ${network.chainName}`);
       return receipt;
     }
     await new Promise((resolve) => window.setTimeout(resolve, 1500));
@@ -591,7 +628,7 @@ async function recordChainEvent(receivableId, type, txHash, chainReceiptId = nul
   const response = await fetch(`/v1/receivables/${receivableId}/chain-events`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...authHeaders() },
-    body: JSON.stringify({ type, txHash, chainId: 968, contractAddress: CONTRACTS.receivables, chainReceiptId: serializedReceiptId })
+    body: JSON.stringify({ type, txHash, chainId: network.chainId, contractAddress: contracts.receivables, chainReceiptId: serializedReceiptId })
   });
   if (!response.ok) drawerFootnote.textContent = 'Transaction succeeded, but Cessio could not save its evidence record.';
 }
@@ -605,18 +642,18 @@ async function submitFunding() {
     if (amount > state.receipt.principal - state.receipt.totalFunded) throw new Error('Amount exceeds the remaining funding capacity');
     const balance = state.tokenBalance ?? await readTokenBalance(state.account);
     state.tokenBalance = balance;
-    if (balance < amount) throw new Error(`Insufficient cUSDT balance. Wallet has ${formatCUSDT(balance)}; requested ${formatCUSDT(amount)}.`);
+    if (balance < amount) throw new Error(`Insufficient ${network.settlementTokenSymbol} balance. Wallet has ${formatCUSDT(balance)}; requested ${formatCUSDT(amount)}.`);
     state.pending = true;
     renderFundingState();
-    await ensureTestnet();
+    await ensureNetwork();
     const approveHash = await window.ethereum.request({
       method: 'eth_sendTransaction',
-      params: [{ from: state.account, to: CONTRACTS.token, data: `0x095ea7b3${encodeAddress(CONTRACTS.receivables)}${encodeWord(amount)}` }]
+      params: [{ from: state.account, to: contracts.token, data: `0x095ea7b3${encodeAddress(contracts.receivables)}${encodeWord(amount)}` }]
     });
     await waitForReceipt(approveHash);
     const fundHash = await window.ethereum.request({
       method: 'eth_sendTransaction',
-      params: [{ from: state.account, to: CONTRACTS.receivables, data: `0xe91c4052${encodeWord(state.receipt.id)}${encodeWord(amount)}` }]
+      params: [{ from: state.account, to: contracts.receivables, data: `0xe91c4052${encodeWord(state.receipt.id)}${encodeWord(amount)}` }]
     });
     await waitForReceipt(fundHash);
     await recordChainEvent(latestDemo?.receivable?.id, 'funded', fundHash, state.receipt?.id);
@@ -649,7 +686,7 @@ async function submitDemo(event) {
   invoice.evidenceDigest = await sha256Hex(JSON.stringify({ reference: invoice.invoiceReference, confidence: invoice.deliveryConfidence, category: invoice.serviceCategory }));
   demoSubmit.disabled = true;
   demoStatus.className = 'form-status';
-  demoStatus.textContent = 'Running bounded Testnet underwriting...';
+  demoStatus.textContent = `Running bounded ${network.key === 'mainnet' ? 'Mainnet' : 'Testnet'} underwriting...`;
   try {
     const response = await fetch('/v1/demo/receivables', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...authHeaders() }, body: JSON.stringify(invoice) });
     const payload = await response.json();
@@ -675,14 +712,14 @@ async function registerDemo() {
   if (!latestDemo?.receivable || !state.account) return connectWallet();
   registerDemoButton.disabled = true;
   try {
-    const nextIdData = await requestWallet('read next receipt ID', 'eth_call', [{ to: CONTRACTS.receivables, data: '0x0ae3cd24' }, 'latest']);
+    const nextIdData = await requestWallet('read next receipt ID', 'eth_call', [{ to: contracts.receivables, data: '0x0ae3cd24' }, 'latest']);
     latestDemoReceiptId = BigInt(nextIdData);
     const amount = parseCUSDT(latestDemo.receivable.requestedFundingAmount);
     const repayment = amount + (amount * BigInt(latestDemo.assessment.decision.expectedYieldBps)) / 10_000n;
     const deadline = BigInt(Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60);
     const invoiceDigest = latestDemo.assessment.invoice.evidenceDigest;
     const assessmentDigest = await sha256Hex(JSON.stringify(latestDemo.assessment.decision));
-    const hash = await requestWallet('register receivable', 'eth_sendTransaction', [{ from: state.account, to: CONTRACTS.receivables, data: encodeCreateReceivable({ originator: state.account, token: CONTRACTS.token, principal: amount, repayment, deadline, invoiceDigest, assessmentDigest }) }]);
+    const hash = await requestWallet('register receivable', 'eth_sendTransaction', [{ from: state.account, to: contracts.receivables, data: encodeCreateReceivable({ originator: state.account, token: contracts.token, principal: amount, repayment, deadline, invoiceDigest, assessmentDigest }) }]);
     await waitForReceipt(hash);
     await recordChainEvent(latestDemo.receivable.id, 'receivable_registered', hash, latestDemoReceiptId);
     latestDemo.receivable.chainEvents = [...(latestDemo.receivable.chainEvents || []), { type: 'receivable_registered', txHash: hash, chainReceiptId: Number(latestDemoReceiptId) }];
@@ -691,7 +728,7 @@ async function registerDemo() {
     state.receiptId = latestDemoReceiptId;
     state.receiptError = null;
     renderReceipt();
-    demoResultCopy.textContent = `Registered on BOT Testnet: ${hash.slice(0, 12)}...${hash.slice(-8)}. You can now approve cUSDT and fund this receipt from the connected wallet.`;
+    demoResultCopy.textContent = `Registered on ${network.chainName}: ${hash.slice(0, 12)}...${hash.slice(-8)}. You can now approve ${network.settlementTokenSymbol} and fund this receipt from the connected wallet.`;
     fundDemoButton.disabled = false;
     fundDemoButton.dataset.receiptId = latestDemoReceiptId.toString();
     renderLatestDemo();
@@ -709,7 +746,7 @@ async function fundDemo() {
   renderReceipt();
   fundAmount.value = '';
   openFundDrawer({ currentTarget: { dataset: { receivable: latestDemo.receivable.obligorName || 'latest demo receivable' } } });
-  demoResultCopy.textContent = 'Receipt registered. Enter a partial or full cUSDT amount in the funding panel; your balance is checked before approval.';
+  demoResultCopy.textContent = `Receipt registered. Enter a partial or full ${network.settlementTokenSymbol} amount in the funding panel; your balance is checked before approval.`;
 }
 
 function setView(view) {
@@ -735,7 +772,7 @@ async function bootstrapWallet() {
   try {
     const [account] = await requestWallet('read connected account', 'eth_accounts');
     if (account) {
-      await ensureTestnet();
+      await ensureNetwork();
       setConnectedAccount(account);
     }
   } catch {
@@ -750,15 +787,15 @@ function watchWallet() {
     else {
       state.account = null;
       walletButton.querySelector('span').textContent = 'Connect wallet';
-      networkStatusText.textContent = 'BOT Testnet';
+      networkStatusText.textContent = network.chainName;
       renderPortfolio();
       refreshWalletBalance();
       renderFundingState();
     }
   });
   window.ethereum.on('chainChanged', (chainId) => {
-    if (chainId.toLowerCase() === TESTNET.chainId) {
-      networkStatusText.textContent = state.account ? 'BOT Testnet connected' : 'BOT Testnet';
+    if (chainId.toLowerCase() === network.chainIdHex) {
+      networkStatusText.textContent = state.account ? `${network.chainName} connected` : network.chainName;
     } else {
       networkStatusText.textContent = 'Wrong network';
     }
@@ -788,11 +825,12 @@ registerDemoButton.addEventListener('click', registerDemo);
   fundDemoButton.addEventListener('click', fundDemo);
 document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeFundDrawer(); });
 window.addEventListener('hashchange', () => setView(window.location.hash.slice(1) || 'market'));
-window.addEventListener('load', () => {
+window.addEventListener('load', async () => {
   const today = new Date();
   const due = new Date(today.getTime() + 20 * 24 * 60 * 60 * 1000);
   demoForm.querySelector('[name="issuedDate"]').value = today.toISOString().slice(0, 10);
   demoForm.querySelector('[name="dueDate"]').value = due.toISOString().slice(0, 10);
+  await loadNetwork();
   renderIcons();
   renderOpportunityRows([]);
   renderMarketMetrics([]);

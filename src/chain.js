@@ -1,24 +1,22 @@
-const BOT_TESTNET_RPC = 'https://rpc.bohr.life';
-const CESSIO_RECEIVABLES = '0x212d99C7fC7C83901e8d6BB0F82d937F9735d248';
 const GET_RECEIVABLE_SELECTOR = '0xa94c9f7d';
 
-export function createTestnetReceiptReader({ fetchImpl = fetch, rpcUrl = BOT_TESTNET_RPC } = {}) {
+export function createReceiptReader(network, { fetchImpl = fetch } = {}) {
   return Object.freeze({
     async getReceipt(receivableId) {
       if (!Number.isSafeInteger(receivableId) || receivableId < 1) throw new Error('Invalid receipt ID');
-      const response = await withTimeout(fetchImpl(rpcUrl, {
+      const response = await withTimeout(fetchImpl(network.rpcUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           jsonrpc: '2.0',
           id: receivableId,
           method: 'eth_call',
-          params: [{ to: CESSIO_RECEIVABLES, data: `${GET_RECEIVABLE_SELECTOR}${encodeWord(receivableId)}` }, 'latest']
+          params: [{ to: network.receivablesAddress, data: `${GET_RECEIVABLE_SELECTOR}${encodeWord(receivableId)}` }, 'latest']
         })
       }));
-      if (!response.ok) throw new Error('BOT Testnet RPC request failed');
+      if (!response.ok) throw new Error(`${network.chainName} RPC request failed`);
       const payload = await response.json();
-      if (payload.error || !payload.result) throw new Error('BOT Testnet receipt read failed');
+      if (payload.error || !payload.result) throw new Error(`${network.chainName} receipt read failed`);
       return decodeReceipt(receivableId, payload.result);
     }
   });
@@ -26,7 +24,7 @@ export function createTestnetReceiptReader({ fetchImpl = fetch, rpcUrl = BOT_TES
 
 function withTimeout(promise, timeoutMs = 12_000) {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('BOT Testnet RPC timed out')), timeoutMs);
+    const timer = setTimeout(() => reject(new Error('BOT Chain RPC timed out')), timeoutMs);
     promise.then(
       (value) => { clearTimeout(timer); resolve(value); },
       (error) => { clearTimeout(timer); reject(error); }
@@ -39,7 +37,7 @@ function encodeWord(value) {
 }
 
 function decodeReceipt(id, data) {
-  if (typeof data !== 'string' || data.length !== 642) throw new Error('Unexpected BOT Testnet receipt response');
+  if (typeof data !== 'string' || data.length !== 642) throw new Error('Unexpected BOT Chain receipt response');
   const wordAt = (index) => data.slice(2 + index * 64, 2 + (index + 1) * 64);
   return {
     id,

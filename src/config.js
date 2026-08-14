@@ -20,6 +20,7 @@ export function loadConfig(env = process.env) {
     demoMode: truthy.has((env.DEMO_MODE ?? 'false').toLowerCase()),
     databaseUrl: env.DATABASE_URL ?? '',
     underwritingProvider: env.UNDERWRITING_PROVIDER ?? 'deterministic',
+    network: loadNetworkConfig(env),
     ai: {
       apiUrl: env.AI_API_URL,
       apiKey: env.AI_API_KEY,
@@ -27,3 +28,4 @@ export function loadConfig(env = process.env) {
     }
   });
 }
+import { loadNetworkConfig } from './network.js';

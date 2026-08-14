@@ -51,9 +51,9 @@
 
         <section class="chain-proof" aria-labelledby="proof-title" data-view-panel="market">
           <div class="proof-intro">
-            <p class="eyebrow">Contract evidence <span>968</span></p>
+            <p class="eyebrow">Contract evidence <span id="proof-chain-id">968</span></p>
             <h2 id="proof-title">Testnet receipt, readable on-chain.</h2>
-            <p>Receipt #1 was created, funded, repaid, and claimed through the deployed Cessio contracts.</p>
+            <p id="proof-copy">Receipt #1 was created, funded, repaid, and claimed through the deployed Cessio contracts.</p>
           </div>
           <div class="proof-state" id="proof-state" data-state="loading">
             <div class="proof-state-heading"><span class="status status-neutral" id="receipt-status"><i data-lucide="loader-circle"></i><span id="receipt-status-text">Loading receipt</span></span><button class="text-button" id="sync-chain"><i data-lucide="refresh-cw"></i><span>Sync chain</span></button></div>
@@ -63,10 +63,10 @@
               <div><dt>Investor claim</dt><dd id="receipt-claim">--</dd></div>
             </dl>
             <div class="proof-contracts" aria-label="Verified Testnet contracts">
-              <a href="https://scan.bohr.life/address/0x212d99C7fC7C83901e8d6BB0F82d937F9735d248" target="_blank" rel="noreferrer">Verified receivables contract <i data-lucide="arrow-up-right"></i></a>
-              <a href="https://scan.bohr.life/address/0x4D0984B958b4376dE072DC098404c4afA9155C90" target="_blank" rel="noreferrer">Verified cUSDT test token <i data-lucide="arrow-up-right"></i></a>
+              <a id="receivables-contract-link" href="https://scan.bohr.life/address/0x212d99C7fC7C83901e8d6BB0F82d937F9735d248" target="_blank" rel="noreferrer">Verified receivables contract <i data-lucide="arrow-up-right"></i></a>
+              <a id="settlement-token-link" href="https://scan.bohr.life/address/0x4D0984B958b4376dE072DC098404c4afA9155C90" target="_blank" rel="noreferrer">Verified cUSDT test token <i data-lucide="arrow-up-right"></i></a>
             </div>
-            <a class="proof-link" href="https://scan.bohr.life/tx/0xc9ee384ea1004ca2c10a4c9ef2659c2d44c7631156ac66f8b3f20af249219186" target="_blank" rel="noreferrer"><span>Open claim transaction</span><i data-lucide="arrow-up-right"></i></a>
+            <a class="proof-link" id="claim-transaction-link" href="https://scan.bohr.life/tx/0xc9ee384ea1004ca2c10a4c9ef2659c2d44c7631156ac66f8b3f20af249219186" target="_blank" rel="noreferrer"><span id="claim-transaction-copy">Open claim transaction</span><i data-lucide="arrow-up-right"></i></a>
           </div>
         </section>
 
@@ -148,7 +148,7 @@
           <div class="view-heading"><p class="eyebrow">Wallet workspace <span>02</span></p><h2 id="portfolio-title">Your Cessio portfolio.</h2><p>Track the connected wallet, available cUSDT, and the current on-chain receipt without mixing portfolio state into the funding workflow.</p></div>
           <div class="portfolio-grid">
             <article class="portfolio-panel"><p class="eyebrow">Connected wallet</p><strong id="portfolio-account">Not connected</strong><span id="portfolio-network">Connect a wallet to continue</span><button class="button button-quiet" id="portfolio-connect"><i data-lucide="wallet-cards"></i><span>Connect wallet</span></button></article>
-            <article class="portfolio-panel"><p class="eyebrow">cUSDT balance</p><strong id="portfolio-balance">--</strong><span>BOT Testnet settlement token</span><button class="text-button" id="portfolio-refresh"><i data-lucide="refresh-cw"></i><span>Refresh balance</span></button></article>
+            <article class="portfolio-panel"><p class="eyebrow" id="portfolio-token-label">cUSDT balance</p><strong id="portfolio-balance">--</strong><span id="portfolio-token-note">BOT Testnet settlement token</span><button class="text-button" id="portfolio-refresh"><i data-lucide="refresh-cw"></i><span>Refresh balance</span></button></article>
             <article class="portfolio-panel portfolio-wide"><p class="eyebrow">Current receipt</p><strong id="portfolio-receipt">Receipt #1</strong><span id="portfolio-receipt-state">Loading on-chain state</span><div class="portfolio-receipt-data"><span>Funded <b id="portfolio-funded">--</b></span><span>Repayment <b id="portfolio-repayment">--</b></span></div></article>
             <article class="portfolio-panel portfolio-wide"><div class="section-heading activity-heading"><div><p class="eyebrow">Activity</p><strong>Funding history</strong></div><span class="mono">THIS WALLET</span></div><div class="portfolio-activity" id="portfolio-activity"><span class="portfolio-empty">No funding activity recorded in this browser yet.</span></div></article>
           </div>

@@ -1,6 +1,7 @@
 import { parseAssessmentRequest, parseChainEventRequest, parseDemoInvoiceRequest, parseReceivableRequest, ValidationError } from './validation.js';
 import { isDomainError } from './service.js';
 import { authAddress, WalletAuth } from './auth.js';
+import { publicNetworkConfig } from './network.js';
 
 const MAX_BODY_BYTES = 64 * 1024;
 const WINDOW_MS = 15 * 60 * 1000;
@@ -21,8 +22,9 @@ export function createApp({ config, service, chainReader }) {
     try {
       const url = new URL(request.url, 'http://localhost');
       if (request.method === 'GET' && url.pathname === '/health') {
-        return send(response, 200, { status: 'ok', service: 'cessio-api', underwritingProvider: config.underwritingProvider, storage: config.databaseUrl ? 'postgres' : 'file', demoMode: config.demoMode, unauthenticatedWritesEnabled: config.allowUnauthenticatedWrites }, requestId);
+        return send(response, 200, { status: 'ok', service: 'cessio-api', network: config.network.key, chainId: config.network.chainId, underwritingProvider: config.underwritingProvider, storage: config.databaseUrl ? 'postgres' : 'file', demoMode: config.demoMode, unauthenticatedWritesEnabled: config.allowUnauthenticatedWrites }, requestId);
       }
+      if (request.method === 'GET' && url.pathname === '/v1/network') return send(response, 200, { network: publicNetworkConfig(config.network) }, requestId);
       const nonceMatch = url.pathname.match(/^\/v1\/auth\/nonce\/(0x[a-fA-F0-9]{40})$/);
       if (request.method === 'GET' && nonceMatch) return send(response, 200, { address: nonceMatch[1].toLowerCase(), nonce: walletAuth.issueNonce(nonceMatch[1]) }, requestId);
       if (request.method === 'POST' && url.pathname === '/v1/auth/verify') {
@@ -32,7 +34,7 @@ export function createApp({ config, service, chainReader }) {
       }
       const chainReceiptMatch = url.pathname.match(/^\/v1\/chain\/receipts\/([1-9]\d*)$/);
       if (request.method === 'GET' && chainReceiptMatch) {
-        if (!chainReader) return send(response, 503, { error: { code: 'CHAIN_READER_UNAVAILABLE', message: 'Testnet receipt reader is unavailable' } }, requestId);
+        if (!chainReader) return send(response, 503, { error: { code: 'CHAIN_READER_UNAVAILABLE', message: 'BOT Chain receipt reader is unavailable' } }, requestId);
         return send(response, 200, { receipt: await chainReader.getReceipt(Number(chainReceiptMatch[1])) }, requestId);
       }
 

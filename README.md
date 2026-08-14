@@ -64,6 +64,10 @@ npm start
 
 Without `DATABASE_URL`, the app uses `data/cessio.json`, which is not durable across Railway redeploys.
 
+### Mainnet activation
+
+The application defaults to Testnet. Do not set `CESSIO_NETWORK=mainnet` until the Cessio mainnet contracts are deployed and verified. Railway must then provide `BOT_MAINNET_RPC`, `CESSIO_RECEIVABLES_ADDRESS`, and `CESSIO_SETTLEMENT_TOKEN_ADDRESS`; startup fails if any of these values are missing. The public `/v1/network` endpoint becomes the single source for the browser wallet, explorer, receipt reader, settlement token, and BDEX route.
+
 Open http://localhost:3001 after the server starts.
 
 ## API
