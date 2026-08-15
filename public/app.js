@@ -1,15 +1,15 @@
 const FALLBACK_NETWORK = Object.freeze({
-  key: 'testnet',
-  chainId: 968,
-  chainIdHex: '0x3c8',
-  chainName: 'BOT Chain Testnet',
+  key: 'mainnet',
+  chainId: 677,
+  chainIdHex: '0x2a5',
+  chainName: 'BOT Chain Mainnet',
   nativeCurrency: { name: 'BOT', symbol: 'BOT', decimals: 18 },
-  rpcUrl: 'https://rpc.bohr.life',
-  explorerUrl: 'https://scan.bohr.life',
-  receivablesAddress: '0x212d99C7fC7C83901e8d6BB0F82d937F9735d248',
-  settlementTokenAddress: '0x4D0984B958b4376dE072DC098404c4afA9155C90',
-  settlementTokenSymbol: 'cUSDT',
-  bdex: { router: '0xD6425a02f0845B8D99e349C34D2E7A576E177345', wbot: '0xD5452816194a3784dBa983426cCe7c122F4abd30', usdt: '0x75edC9335175Fc0552D51D48439F229c10420fe3' }
+  rpcUrl: 'https://rpc.botchain.ai',
+  explorerUrl: 'https://scan.botchain.ai',
+  receivablesAddress: '0x482910B7E491044be44aB1415F92dfa7c9e10A2B',
+  settlementTokenAddress: '0xaBabc7Ddc03e501d190C676BF3d92ef0e6e87a3C',
+  settlementTokenSymbol: 'USDT',
+  bdex: { router: '0x1414eD29FdFD322c3c0a830330ed982E2D629e76', wbot: '0xD5452816194a3784dBa983426cCe7c122F4abd30', usdt: '0xaBabc7Ddc03e501d190C676BF3d92ef0e6e87a3C' }
 });
 
 let network = FALLBACK_NETWORK;
@@ -113,10 +113,10 @@ async function loadNetwork() {
 
   networkStatusText.textContent = network.chainName;
   proofChainId.textContent = String(network.chainId);
-  proofTitle.textContent = `${network.key === 'mainnet' ? 'Mainnet' : 'Testnet'} receipt, readable on-chain.`;
+  proofTitle.textContent = `${network.chainName.replace('BOT Chain ', '')} receipt, readable on-chain.`;
   proofCopy.textContent = network.key === 'mainnet'
     ? 'Mainnet receipt evidence appears here after the first Cessio lifecycle completes on the deployed contracts.'
-    : 'Receipt #1 was created, funded, repaid, and claimed through the deployed Cessio contracts.';
+    : 'Receipts are created, funded, repaid, and claimed through the deployed Cessio contracts.';
   receivablesContractLink.href = `${network.explorerUrl}/address/${contracts.receivables}`;
   settlementTokenLink.href = `${network.explorerUrl}/address/${contracts.token}`;
   settlementTokenLink.firstChild.textContent = `Verified ${network.settlementTokenSymbol} settlement token `;
@@ -134,7 +134,7 @@ function setButton(button, text, disabled) {
   if (button === fundButton) fundButtonText.textContent = text;
 }
 
-function formatCUSDT(amount) {
+function formatSettlementAmount(amount) {
   const whole = amount / 1_000_000n;
   const fraction = (amount % 1_000_000n).toString().padStart(6, '0').replace(/0+$/, '');
   return `${whole.toLocaleString()}${fraction ? `.${fraction}` : ''} ${network.settlementTokenSymbol}`;
@@ -205,13 +205,13 @@ function renderReceipt() {
   proofState.dataset.state = settled ? 'settled' : 'open';
   receiptStatus.className = `status ${settled ? 'status-approved' : 'status-neutral'}`;
   receiptStatusText.textContent = `Receipt #${state.receipt.id} ${status}`;
-  receiptPrincipal.textContent = formatCUSDT(state.receipt.totalFunded);
-  receiptRepayment.textContent = formatCUSDT(state.receipt.repayment);
+  receiptPrincipal.textContent = formatSettlementAmount(state.receipt.totalFunded);
+  receiptRepayment.textContent = formatSettlementAmount(state.receipt.repayment);
   receiptClaim.textContent = settled ? 'Completed' : 'Pending';
   portfolioReceipt.textContent = `Receipt #${state.receipt.id}`;
   portfolioReceiptState.textContent = `${status} on ${network.chainName}`;
-  portfolioFunded.textContent = formatCUSDT(state.receipt.totalFunded);
-  portfolioRepayment.textContent = formatCUSDT(state.receipt.repayment);
+  portfolioFunded.textContent = formatSettlementAmount(state.receipt.totalFunded);
+  portfolioRepayment.textContent = formatSettlementAmount(state.receipt.repayment);
   renderFundingState();
 }
 
@@ -228,7 +228,7 @@ function renderFundingState() {
     return;
   }
   drawerCopy.textContent = `This ${network.chainName} receipt is open. Your wallet will approve ${network.settlementTokenSymbol} first, then submit a separate funding transaction.`;
-  if (state.tokenBalance !== null) drawerFootnote.textContent = `Available balance: ${formatCUSDT(state.tokenBalance)}. Funding checks this balance before approval.`;
+  if (state.tokenBalance !== null) drawerFootnote.textContent = `Available balance: ${formatSettlementAmount(state.tokenBalance)}. Funding checks this balance before approval.`;
   setButton(fundButton, state.pending ? 'Wallet confirmation in progress' : 'Approve and fund', state.pending);
 }
 
@@ -254,7 +254,7 @@ async function readTokenBalance(account) {
 function renderPortfolio() {
   portfolioAccount.textContent = state.account ? `${state.account.slice(0, 10)}...${state.account.slice(-8)}` : 'Not connected';
   portfolioNetwork.textContent = state.account ? `${network.chainName} connected` : 'Connect a wallet to continue';
-  portfolioBalance.textContent = state.tokenBalance === null ? '--' : formatCUSDT(state.tokenBalance);
+  portfolioBalance.textContent = state.tokenBalance === null ? '--' : formatSettlementAmount(state.tokenBalance);
   portfolioConnect.hidden = Boolean(state.account);
   portfolioActivity.innerHTML = activity.length
     ? activity.map((entry) => `<div class="activity-row"><span><strong>${entry.label}</strong><small>${entry.hash}</small></span><b>${entry.amount} ${network.settlementTokenSymbol}</b></div>`).join('')
@@ -269,7 +269,7 @@ function renderOpportunityRows(receivables = []) {
   const rows = receivables.map((entry) => {
     const invoice = entry.invoice || {};
     const decision = entry.underwriting || {};
-    const label = invoice.obligorName || 'Testnet originator';
+    const label = invoice.obligorName || 'Originator';
     const amount = Number(entry.requestedFundingAmount || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
     const risk = Number(decision.riskScore ?? 0);
     const riskClass = risk <= 30 ? 'low' : 'review';
@@ -298,7 +298,7 @@ function renderMarketMetrics(receivables = []) {
   const middle = Math.floor(terms.length / 2);
   const medianTerm = terms.length ? (terms.length % 2 ? terms[middle] : Math.round((terms[middle - 1] + terms[middle]) / 2)) : null;
 
-  metricOpenCapacity.textContent = formatCUSDT(openCapacity);
+  metricOpenCapacity.textContent = formatSettlementAmount(openCapacity);
   metricOpenCapacityNote.textContent = readableReceipts.length ? 'Across readable registered receipts' : 'No readable registered receipts';
   metricReceiptCount.textContent = String(receivables.length);
   metricReceiptCountNote.textContent = `Registered on ${network.chainName}`;
@@ -313,7 +313,7 @@ function renderLatestDemo() {
   demoResults.hidden = false;
   const decision = latestDemo.assessment?.decision || {};
   const registered = latestDemoReceiptId !== null || latestDemo.receivable.chainEvents?.some((event) => event.type === 'receivable_registered');
-  demoResultTitle.textContent = registered ? `Registered on ${network.chainName}` : decision.decision === 'approved' ? `Approved for ${network.key === 'mainnet' ? 'Mainnet' : 'Testnet'} registration` : 'Held for review';
+  demoResultTitle.textContent = registered ? `Registered on ${network.chainName}` : decision.decision === 'approved' ? `Approved for ${network.chainName.replace('BOT Chain ', '')} registration` : 'Held for review';
   demoResultCopy.textContent = registered
     ? 'This receivable is registered and available in Opportunities for funding.'
     : `Risk ${decision.riskScore}/100. Maximum funding: ${decision.maxFundingAmount} USD. Register it from the connected underwriter wallet to create the on-chain receipt.`;
@@ -601,7 +601,7 @@ async function connectWallet() {
   }
 }
 
-function parseCUSDT(value) {
+function parseSettlementAmount(value) {
   const normalized = value.trim();
   if (!/^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/.test(normalized)) throw new Error(`Enter a ${network.settlementTokenSymbol} amount with up to 6 decimals`);
   const [whole, fraction = ''] = normalized.split('.');
@@ -638,11 +638,11 @@ async function submitFunding() {
   if (!state.receipt || state.receipt.status !== 1) return;
   let amount;
   try {
-    amount = parseCUSDT(fundAmount.value);
+    amount = parseSettlementAmount(fundAmount.value);
     if (amount > state.receipt.principal - state.receipt.totalFunded) throw new Error('Amount exceeds the remaining funding capacity');
     const balance = state.tokenBalance ?? await readTokenBalance(state.account);
     state.tokenBalance = balance;
-    if (balance < amount) throw new Error(`Insufficient ${network.settlementTokenSymbol} balance. Wallet has ${formatCUSDT(balance)}; requested ${formatCUSDT(amount)}.`);
+    if (balance < amount) throw new Error(`Insufficient ${network.settlementTokenSymbol} balance. Wallet has ${formatSettlementAmount(balance)}; requested ${formatSettlementAmount(amount)}.`);
     state.pending = true;
     renderFundingState();
     await ensureNetwork();
@@ -686,7 +686,7 @@ async function submitDemo(event) {
   invoice.evidenceDigest = await sha256Hex(JSON.stringify({ reference: invoice.invoiceReference, confidence: invoice.deliveryConfidence, category: invoice.serviceCategory }));
   demoSubmit.disabled = true;
   demoStatus.className = 'form-status';
-  demoStatus.textContent = `Running bounded ${network.key === 'mainnet' ? 'Mainnet' : 'Testnet'} underwriting...`;
+  demoStatus.textContent = `Running bounded ${network.chainName.replace('BOT Chain ', '')} underwriting...`;
   try {
     const response = await fetch('/v1/demo/receivables', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...authHeaders() }, body: JSON.stringify(invoice) });
     const payload = await response.json();
@@ -695,7 +695,7 @@ async function submitDemo(event) {
     localStorage.setItem('cessio-latest-demo', JSON.stringify(latestDemo));
     await refreshOpportunities();
     renderLatestDemo();
-    demoResultTitle.textContent = payload.assessment.decision.decision === 'approved' ? 'Approved for Testnet registration' : 'Held for review';
+    demoResultTitle.textContent = payload.assessment.decision.decision === 'approved' ? `Approved for ${network.chainName.replace('BOT Chain ', '')} registration` : 'Held for review';
     demoResultCopy.textContent = payload.receivable ? `Risk ${payload.assessment.decision.riskScore}/100. Maximum funding: ${payload.assessment.decision.maxFundingAmount} ${invoice.currency}. Register it from the connected underwriter wallet to create the on-chain receipt.` : payload.assessment.decision.reasons.join(' ');
     registerDemoButton.disabled = !payload.receivable;
     demoStatus.className = 'form-status success';
@@ -714,7 +714,7 @@ async function registerDemo() {
   try {
     const nextIdData = await requestWallet('read next receipt ID', 'eth_call', [{ to: contracts.receivables, data: '0x0ae3cd24' }, 'latest']);
     latestDemoReceiptId = BigInt(nextIdData);
-    const amount = parseCUSDT(latestDemo.receivable.requestedFundingAmount);
+    const amount = parseSettlementAmount(latestDemo.receivable.requestedFundingAmount);
     const repayment = amount + (amount * BigInt(latestDemo.assessment.decision.expectedYieldBps)) / 10_000n;
     const deadline = BigInt(Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60);
     const invoiceDigest = latestDemo.assessment.invoice.evidenceDigest;
@@ -761,7 +761,7 @@ async function refreshMarket() {
   try {
     await Promise.all([refreshOpportunities(), refreshContractState()]);
   } catch {
-    // Contract evidence is independently read from the Testnet RPC.
+    // Contract evidence is independently read from the configured BOT Chain RPC.
   } finally {
     refreshButton.removeAttribute('aria-busy');
   }

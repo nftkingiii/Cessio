@@ -8,34 +8,32 @@ Public X account: https://x.com/cessioapp
 ## What is included
 
 - Evidence-aware underwriting for structured invoice metadata.
-- Bounded approval and review decisions with a deterministic provider for local and Testnet development.
+- Bounded approval and review decisions with a deterministic provider for local and Mainnet demo operation.
 - Receivable lifecycle records and append-only audit events.
-- Wallet connection and BOT Chain Testnet receipt read-back in the web app.
-- Verified Testnet contracts and explorer-linked settlement proof.
+- Wallet connection and BOT Chain Mainnet receipt read-back in the web app.
+- Verified Mainnet contracts and explorer-linked settlement proof.
 - Railway deployment configuration with a `/health` endpoint.
 
-The current release is Testnet Live. Railway uses PostgreSQL when `DATABASE_URL` is configured and falls back to the local file repository for development. Demo-mode Testnet creation remains intentionally bounded; general write endpoints require a verified wallet signature session.
+The current public release is a BOT Chain Mainnet pilot. Railway uses PostgreSQL when `DATABASE_URL` is configured and falls back to the local file repository for development. Controlled demo creation remains enabled for product inspection; general write endpoints require a verified wallet signature session.
 
-## BOT Chain Testnet
+## BOT Chain Mainnet
 
-Network: BOT Chain Testnet, chain ID `968`
-RPC: `https://rpc.bohr.life`
-Explorer: `https://scan.bohr.life`
+Network: BOT Chain Mainnet, chain ID `677`
+RPC: `https://rpc.botchain.ai`
+Explorer: `https://scan.botchain.ai`
 
 | Contract | Address |
 | --- | --- |
-| CessioReceivables | [`0x212d99C7fC7C83901e8d6BB0F82d937F9735d248`](https://scan.bohr.life/address/0x212d99C7fC7C83901e8d6BB0F82d937F9735d248) |
-| MockUSDT / cUSDT | [`0x4D0984B958b4376dE072DC098404c4afA9155C90`](https://scan.bohr.life/address/0x4D0984B958b4376dE072DC098404c4afA9155C90) |
+| CessioReceivables | [`0x482910B7E491044be44aB1415F92dfa7c9e10A2B`](https://scan.botchain.ai/address/0x482910B7E491044be44aB1415F92dfa7c9e10A2B) |
+| Official BOT Chain USDT | [`0xaBabc7Ddc03e501d190C676BF3d92ef0e6e87a3C`](https://scan.botchain.ai/address/0xaBabc7Ddc03e501d190C676BF3d92ef0e6e87a3C) |
 
-Receipt #1 was completed on Testnet. The verified read-back shows `100 cUSDT` funded, `105 cUSDT` repaid, the investor claim recorded, and the receivables contract retaining `0 cUSDT` after settlement.
+The public app is configured for Mainnet. Historical Testnet lifecycle artifacts remain in git history as development evidence; new public activity uses the verified Mainnet receivables contract and official BOT Chain USDT.
 
 Lifecycle proof:
 
-- [Deploy CessioReceivables](https://scan.bohr.life/tx/0xd1044c3ae6e110462ceb0851c121d7d895591d6b9184e113e7c9d6a38d4917ce)
-- [Create receivable](https://scan.bohr.life/tx/0x7dce3dc96ec96195877547a299e71ab20d117b40c12c65c09e44d33af41c0b17)
-- [Fund](https://scan.bohr.life/tx/0x14935a3db3e5fb093f8f23e8a8fd1781ebf4d65c8caf4d6c6d4167e34a50f4ee)
-- [Repay](https://scan.bohr.life/tx/0xd87dfee7c77ef0d81278ad3ef1fa91475aaab4484a07e7c9d0b1a3a975d8252a)
-- [Claim](https://scan.bohr.life/tx/0xc9ee384ea1004ca2c10a4c9ef2659c2d44c7631156ac66f8b3f20af249219186)
+- [Deploy CessioReceivables](https://scan.botchain.ai/tx/0x6f1b8d106c434706199993f83c401fe836ea15f7b13c7e756ec1c48f1f61a7e5)
+
+Mainnet registration, funding, repayment, and claim evidence will be linked here as each controlled demo step is completed.
 
 ## Run locally
 
@@ -45,7 +43,7 @@ $env:ALLOW_UNAUTHENTICATED_WRITES='true'
 npm start
 ```
 
-`ALLOW_UNAUTHENTICATED_WRITES` is only for local/testnet development. The service rejects writes by default until wallet-signature authentication is added.
+`ALLOW_UNAUTHENTICATED_WRITES` is only for local development. The public service rejects writes by default until wallet-signature authentication is completed.
 
 To run the web app without enabling writes:
 
@@ -59,14 +57,29 @@ npm start
 1. In Railway, add a PostgreSQL service to the project.
 2. In the Cessio service variables, add `DATABASE_URL` using the PostgreSQL service's connection reference.
 3. Keep `ALLOW_UNAUTHENTICATED_WRITES=false`.
-4. Keep `DEMO_MODE=true` only while the public Testnet demo is needed.
+4. Keep `DEMO_MODE=true` only while the controlled public demo is needed.
 5. Redeploy and confirm `/health` reports `status: ok`, then create one demo record and verify it remains after a restart.
 
 Without `DATABASE_URL`, the app uses `data/cessio.json`, which is not durable across Railway redeploys.
 
-### Mainnet activation
+### Mainnet configuration
 
-The application defaults to Testnet. Do not set `CESSIO_NETWORK=mainnet` until the Cessio mainnet contracts are deployed and verified. Railway must then provide `BOT_MAINNET_RPC`, `CESSIO_RECEIVABLES_ADDRESS`, and `CESSIO_SETTLEMENT_TOKEN_ADDRESS`; startup fails if any of these values are missing. The public `/v1/network` endpoint becomes the single source for the browser wallet, explorer, receipt reader, settlement token, and BDEX route.
+The public deployment runs on BOT Chain Mainnet. Railway provides `CESSIO_NETWORK=mainnet`, `BOT_MAINNET_RPC`, `CESSIO_RECEIVABLES_ADDRESS`, and `CESSIO_SETTLEMENT_TOKEN_ADDRESS`; startup fails if any required Mainnet value is missing. The public `/v1/network` endpoint is the single source for the browser wallet, explorer, receipt reader, settlement token, and BDEX route.
+
+Current Mainnet deployment: CessioReceivables at [`0x482910B7E491044be44aB1415F92dfa7c9e10A2B`](https://scan.botchain.ai/address/0x482910B7E491044be44aB1415F92dfa7c9e10A2B), deployed by [`0x6f1b8d106c434706199993f83c401fe836ea15f7b13c7e756ec1c48f1f61a7e5`](https://scan.botchain.ai/tx/0x6f1b8d106c434706199993f83c401fe836ea15f7b13c7e756ec1c48f1f61a7e5). BOTScan source verification is confirmed with Solidity `v0.8.24+commit.e11b9ed9`, Cancun EVM, optimizer enabled with `200` runs, and the underwriter constructor argument. Direct RPC read-back confirms owner and underwriter are `0x89fa09831c33A9651dA38aC37B25E058B6409Cc8`.
+
+#### Mainnet contract deployment
+
+`contracts/script/DeployMainnet.s.sol` is intentionally separate from the Testnet script: it deploys only `CessioReceivables`, never `MockUSDT`. It refuses any chain except BOT Chain Mainnet (`677`) and requires a deployed settlement-token address before broadcast. Use the official BOT Chain USDT address for `SETTLEMENT_TOKEN_ADDRESS`.
+
+```powershell
+Set-Location contracts
+$env:UNDERWRITER_ADDRESS = "<the wallet that may register receivables>"
+$env:SETTLEMENT_TOKEN_ADDRESS = "0xaBabc7Ddc03e501d190C676BF3d92ef0e6e87a3C"
+forge script script/DeployMainnet.s.sol:DeployMainnet --rpc-url https://rpc.botchain.ai --account <local-keystore-name> --broadcast
+```
+
+Before broadcasting, confirm that the selected account is the displayed `UNDERWRITER_ADDRESS`. After deployment, verify the source on BOTScan, set `CESSIO_NETWORK=mainnet` plus the three required Railway variables, redeploy Railway, then prove one wallet-issued registration and funding transaction through the public app.
 
 Open http://localhost:3001 after the server starts.
 
