@@ -19,6 +19,8 @@ const RECEIVABLE_STATUS = ['Unissued', 'Funding', 'Funded', 'Repaid', 'Cancelled
 const state = { account: null, authToken: null, receipt: null, receiptId: 1n, receiptError: null, tokenBalance: null, pending: false };
 
 const walletButton = document.querySelector('#connect-wallet');
+const walletMenu = document.querySelector('#wallet-menu');
+const disconnectWalletButton = document.querySelector('#disconnect-wallet');
 const networkStatusText = document.querySelector('#network-status-text');
 const drawer = document.querySelector('#fund-drawer');
 const backdrop = document.querySelector('#drawer-backdrop');
@@ -274,8 +276,10 @@ function renderOpportunityRows(receivables = []) {
     const risk = Number(decision.riskScore ?? 0);
     const riskClass = risk <= 30 ? 'low' : 'review';
     const chainState = entry.chainState;
-    const fundingPercent = chainState ? Math.min(100, Math.round((Number(chainState.totalFunded) / Number(chainState.principal)) * 100)) : null;
-    const fundingCell = fundingPercent === null ? '<span class="mono">Awaiting registration</span>' : `<div class="mini-progress"><span style="width:${fundingPercent}%"></span></div><span class="mono">${fundingPercent}%</span>`;
+    const principal = chainState ? Number(chainState.principal) : NaN;
+    const funded = chainState ? Number(chainState.totalFunded) : NaN;
+    const fundingPercent = Number.isFinite(principal) && principal > 0 && Number.isFinite(funded) ? Math.min(100, Math.max(0, Math.round((funded / principal) * 100))) : null;
+    const fundingCell = fundingPercent === null ? '<span class="mono">Awaiting readable state</span>' : `<div class="mini-progress"><span style="width:${fundingPercent}%"></span></div><span class="mono">${fundingPercent}%</span>`;
     return `<tr><td><strong>${label}</strong><span>${invoice.serviceCategory || 'Receivable'}</span></td><td>${invoice.invoiceReference || 'Demo invoice'}</td><td>$${amount}</td><td><span class="risk-pill ${riskClass}">${riskClass === 'low' ? 'Low' : 'Review'} · ${risk}</span></td><td>${invoice.dueDate || '--'}</td><td>${fundingCell}</td><td><button class="icon-button open-fund" data-receivable="${label}" aria-label="Fund ${label}"><i data-lucide="arrow-up-right"></i></button></td></tr>`;
   });
   opportunitiesBody.innerHTML = rows.length ? rows.join('') : seedOpportunityRows();
@@ -310,12 +314,16 @@ function renderLatestDemo() {
     demoResults.hidden = true;
     return;
   }
-  demoResults.hidden = false;
   const decision = latestDemo.assessment?.decision || {};
   const registered = latestDemoReceiptId !== null || latestDemo.receivable.chainEvents?.some((event) => event.type === 'receivable_registered');
+  if (registered) {
+    demoResults.hidden = true;
+    return;
+  }
+  demoResults.hidden = false;
   demoResultTitle.textContent = registered ? `Registered on ${network.chainName}` : decision.decision === 'approved' ? `Approved for ${network.chainName.replace('BOT Chain ', '')} registration` : 'Held for review';
   demoResultCopy.textContent = registered
-    ? 'This receivable is registered and available in Opportunities for funding.'
+    ? 'This receivable is registered and available in Market for funding.'
     : `Risk ${decision.riskScore}/100. Maximum funding: ${decision.maxFundingAmount} USD. Register it from the connected underwriter wallet to create the on-chain receipt.`;
   registerDemoButton.disabled = registered || !latestDemo.receivable;
   fundDemoButton.disabled = !registered;
@@ -327,7 +335,7 @@ async function refreshOpportunities() {
     const response = await fetch('/v1/receivables', { headers: { Accept: 'application/json' } });
     const payload = await response.json();
     if (response.ok) {
-      const receivables = payload.receivables || [];
+      const receivables = (payload.receivables || []).filter((entry) => Number(entry.chainId) === Number(network.chainId) && entry.settlementToken?.toLowerCase() === contracts.token.toLowerCase());
       renderOpportunityRows(receivables);
       renderMarketMetrics(receivables);
     }
@@ -568,11 +576,25 @@ function authHeaders() {
 function setConnectedAccount(account) {
   state.account = account;
   state.authToken = null;
+  walletMenu.hidden = true;
+  walletButton.setAttribute('aria-expanded', 'false');
   walletButton.querySelector('span').textContent = `${account.slice(0, 6)}...${account.slice(-4)}`;
   networkStatusText.textContent = `${network.chainName} connected`;
   authenticateWallet(account).then(() => renderPortfolio()).catch((error) => { drawerFootnote.textContent = error.message || 'Wallet sign-in failed'; });
   renderPortfolio();
   refreshWalletBalance();
+  renderFundingState();
+}
+
+function disconnectWallet() {
+  state.account = null;
+  state.authToken = null;
+  state.tokenBalance = null;
+  walletMenu.hidden = true;
+  walletButton.setAttribute('aria-expanded', 'false');
+  walletButton.querySelector('span').textContent = 'Connect wallet';
+  networkStatusText.textContent = network.chainName;
+  renderPortfolio();
   renderFundingState();
 }
 
@@ -731,7 +753,8 @@ async function registerDemo() {
     demoResultCopy.textContent = `Registered on ${network.chainName}: ${hash.slice(0, 12)}...${hash.slice(-8)}. You can now approve ${network.settlementTokenSymbol} and fund this receipt from the connected wallet.`;
     fundDemoButton.disabled = false;
     fundDemoButton.dataset.receiptId = latestDemoReceiptId.toString();
-    renderLatestDemo();
+    await refreshOpportunities();
+    setView('opportunities');
   } catch (error) {
     demoResultCopy.textContent = error.message || 'Registration failed';
     registerDemoButton.disabled = false;
@@ -754,6 +777,7 @@ function setView(view) {
   document.querySelectorAll('[data-view-panel]').forEach((panel) => { panel.hidden = panel.dataset.viewPanel !== next || (panel.id === 'demo-results' && !latestDemo); });
   document.querySelectorAll('[data-view]').forEach((link) => link.classList.toggle('active', link.dataset.view === next));
   if (window.location.hash !== `#${next}`) history.replaceState(null, '', `#${next}`);
+  if (next === 'opportunities') refreshOpportunities();
 }
 
 async function refreshMarket() {
@@ -784,14 +808,7 @@ function watchWallet() {
   if (!window.ethereum?.on) return;
   window.ethereum.on('accountsChanged', ([account]) => {
     if (account) setConnectedAccount(account);
-    else {
-      state.account = null;
-      walletButton.querySelector('span').textContent = 'Connect wallet';
-      networkStatusText.textContent = network.chainName;
-      renderPortfolio();
-      refreshWalletBalance();
-      renderFundingState();
-    }
+    else disconnectWallet();
   });
   window.ethereum.on('chainChanged', (chainId) => {
     if (chainId.toLowerCase() === network.chainIdHex) {
@@ -813,7 +830,18 @@ swapToastClose.addEventListener('click', hideSwapToast);
 document.querySelectorAll('[data-view]').forEach((link) => link.addEventListener('click', (event) => { event.preventDefault(); setView(link.dataset.view); }));
 closeDrawer.addEventListener('click', closeFundDrawer);
 backdrop.addEventListener('click', closeFundDrawer);
-walletButton.addEventListener('click', connectWallet);
+walletButton.addEventListener('click', () => {
+  if (!state.account) return connectWallet();
+  walletMenu.hidden = !walletMenu.hidden;
+  walletButton.setAttribute('aria-expanded', String(!walletMenu.hidden));
+});
+disconnectWalletButton.addEventListener('click', disconnectWallet);
+document.addEventListener('click', (event) => {
+  if (!event.target.closest('.wallet-control')) {
+    walletMenu.hidden = true;
+    walletButton.setAttribute('aria-expanded', 'false');
+  }
+});
 document.querySelector('#portfolio-connect').addEventListener('click', connectWallet);
 document.querySelector('#portfolio-refresh').addEventListener('click', refreshWalletBalance);
 refreshButton.addEventListener('click', refreshMarket);

@@ -17,6 +17,11 @@ a { color:inherit; text-decoration:none; }
 .topbar nav a { min-height:44px; display:grid; place-items:center; border-bottom:1px solid transparent; }
 .topbar nav a.active { color:var(--paper); border-color:var(--signal); }
 .topbar-actions { gap:12px; flex-shrink:0; }
+.wallet-control { position:relative; }
+.wallet-menu { position:absolute; top:calc(100% + 8px); right:0; z-index:8; min-width:180px; padding:6px; border:1px solid var(--line); border-radius:5px; background:#171a18; box-shadow:0 14px 30px rgba(0,0,0,.3); }
+.wallet-menu button { width:100%; display:flex; align-items:center; gap:8px; padding:10px 11px; border:0; border-radius:3px; background:transparent; color:var(--paper); font-size:12px; text-align:left; }
+.wallet-menu button:hover { background:#232824; color:var(--signal); }
+.wallet-menu svg { width:15px; height:15px; }
 .network-status { gap:7px; color:var(--muted); font:11px var(--mono); white-space:nowrap; }
 .network-status > span:first-child { width:7px; height:7px; background:var(--signal); border-radius:50%; box-shadow:0 0 0 3px #20321d; }
 .button,.text-button,.icon-button { border:0; color:var(--paper); }

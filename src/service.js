@@ -70,6 +70,8 @@ export class CessioService {
   async listReceivables() {
     const state = await this.repository.read();
     return state.receivables
+      .filter((receivable) => receivable.chainId === this.network.chainId)
+      .filter((receivable) => receivable.settlementToken?.toLowerCase() === this.network.settlementTokenAddress?.toLowerCase())
       .filter((receivable) => receivable.chainEvents?.some((event) => event.type === 'receivable_registered'))
       .map(publicReceivable);
   }
