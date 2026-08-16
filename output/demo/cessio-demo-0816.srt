@@ -1,0 +1,67 @@
+1
+00:00:00,000 --> 00:00:08,000
+Cessio is an auditable receivables market built on BOT Chain Mainnet.
+
+2
+00:00:08,000 --> 00:00:16,000
+The Overview shows the current market, contract evidence, and settlement state.
+
+3
+00:00:16,000 --> 00:00:25,000
+Receivables are tied to real compute and digital-service invoices.
+
+4
+00:00:25,000 --> 00:00:35,000
+The on-chain evidence panel reads from the deployed Cessio contracts.
+
+5
+00:00:35,000 --> 00:00:45,000
+The originator opens Create invoice and enters the invoice details.
+
+6
+00:00:45,000 --> 00:00:55,000
+Delivery evidence confidence is included in the underwriting request.
+
+7
+00:00:55,000 --> 00:01:05,000
+Cessio evaluates the invoice and returns approval status, risk, and funding capacity.
+
+8
+00:01:05,000 --> 00:01:15,000
+The approved invoice can now be registered on BOT Chain Mainnet.
+
+9
+00:01:15,000 --> 00:01:25,000
+The wallet signs registration; Cessio never takes custody of user funds.
+
+10
+00:01:25,000 --> 00:01:35,000
+After registration, the app moves to Market and refreshes the listing automatically.
+
+11
+00:01:35,000 --> 00:01:45,000
+The Market shows the invoice target, risk, term, and funding progress.
+
+12
+00:01:45,000 --> 00:01:55,000
+An investor opens the receivable and chooses a partial or full USDT amount.
+
+13
+00:01:55,000 --> 00:02:05,000
+Funding requires explicit USDT approval followed by a separate confirmation.
+
+14
+00:02:05,000 --> 00:02:15,000
+Once confirmed, the funding activity is recorded against the connected wallet.
+
+15
+00:02:15,000 --> 00:02:25,000
+Portfolio brings together the wallet, USDT balance, receipt state, and funding history.
+
+16
+00:02:25,000 --> 00:02:35,000
+The Swap / Bridge tab prepares capital for settlement without Cessio holding user funds.
+
+17
+00:02:35,000 --> 00:02:37,269
+BDEX provides the swap rail into BOT Chain USDT.
